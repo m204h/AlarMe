@@ -1,2 +1,2 @@
 # AlarMe
-Free alarm app
+An open source alternative to Alarmy
