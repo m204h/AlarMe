@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?attr/colorSurface"
+    android:padding="16dp">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp"
+        android:layout_marginBottom="8dp">
+
+        <Button
+            android:id="@+id/btnCancel"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/cancel"/>
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/new_alarm"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center"/>
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/save"/>
+
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="16dp">
+
+            <!-- Time Picker -->
+            <TimePicker
+                android:id="@+id/timePicker"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:timePickerMode="spinner"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="16dp"/>
+
+            <!-- Repeat Days Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/repeat_days"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:layout_marginBottom="8dp"/>
+
+            <!-- Day buttons row (Mon to Sun) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="7"
+                android:layout_marginBottom="12dp">
+
+                <ToggleButton
+                    android:id="@+id/btnMon"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="@string/day_mon"
+                    android:textOff="@string/day_mon"
+                    android:textSize="11sp"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:layout_margin="1dp"/>
+
+                <ToggleButton
+                    android:id="@+id/btnTue"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="@string/day_tue"
+                    android:textOff="@string/day_tue"
+                    android:textSize="11sp"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:layout_margin="1dp"/>
+
+                <ToggleButton
+                    android:id="@+id/btnWed"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="@string/day_wed"
+                    android:textOff="@string/day_wed"
+                    android:textSize="11sp"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:layout_margin="1dp"/>
+
+                <ToggleButton
+                    android:id="@+id/btnThu"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="@string/day_thu"
+                    android:textOff="@string/day_thu"
+                    android:textSize="11sp"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:layout_margin="1dp"/>
+
+                <ToggleButton
+                    android:id="@+id/btnFri"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="@string/day_fri"
+                    android:textOff="@string/day_fri"
+                    android:textSize="11sp"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:layout_margin="1dp"/>
+
+                <ToggleButton
+                    android:id="@+id/btnSat"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="@string/day_sat"
+                    android:textOff="@string/day_sat"
+                    android:textSize="11sp"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:layout_margin="1dp"/>
+
+                <ToggleButton
+                    android:id="@+id/btnSun"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:textOn="@string/day_sun"
+                    android:textOff="@string/day_sun"
+                    android:textSize="11sp"
+                    android:padding="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:ellipsize="none"
+                    android:layout_margin="1dp"/>
+
+            </LinearLayout>
+
+            <!-- Quick Preset Buttons (Every day / Once) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="20dp">
+
+                <Button
+                    android:id="@+id/btnEveryDay"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/every_day"
+                    android:layout_marginEnd="6dp"/>
+
+                <Button
+                    android:id="@+id/btnOnce"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/once"
+                    android:layout_marginStart="6dp"/>
+
+            </LinearLayout>
+
+            <!-- Alarm Label Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/alarm_name"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/etAlarmLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/alarm_hint"
+                android:inputType="textCapWords"
+                android:maxLines="1"
+                android:padding="12dp"
+                android:autofillHints="name"/>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>

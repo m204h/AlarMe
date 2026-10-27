@@ -1,3 +1,38 @@
 <resources>
     <string name="app_name">AlarMe</string>
+    <string name="menu_feedback">Send Feedback</string>
+    <string name="menu_diagnostics">Crash &amp; Diagnostic Settings</string>
+    <string name="feedback_title">Send Feedback</string>
+    <string name="feedback_type_label">Feedback Type</string>
+    <string name="feedback_type_bug">Bug Report</string>
+    <string name="feedback_type_suggestion">Feature Suggestion</string>
+    <string name="feedback_type_general">General Feedback</string>
+    <string name="feedback_desc_hint">Describe your issue or suggestion here...</string>
+    <string name="feedback_email_hint">Contact email (optional)</string>
+    <string name="feedback_include_diagnostics">Include basic diagnostic info (App version, Android version, Device model)</string>
+    <string name="feedback_submit">Submit Feedback</string>
+    <string name="feedback_success">Thank you! Your feedback has been prepared for sending.</string>
+    <string name="feedback_error_empty">Please enter a description for your feedback.</string>
+    <string name="diagnostics_title">Crash &amp; Diagnostic Settings</string>
+    <string name="diagnostics_desc">Help us improve AlarMe by automatically sharing anonymous crash reports and diagnostics. You can enable or disable this at any time.</string>
+    <string name="diagnostics_enable">Enable Diagnostic Reporting</string>
+
+    <!-- Add / Edit Alarm Screen Strings -->
+    <string name="new_alarm">New Alarm</string>
+    <string name="edit_alarm">Edit Alarm</string>
+    <string name="repeat_days">Repeat Days</string>
+    <string name="every_day">Every day</string>
+    <string name="once">Once</string>
+    <string name="alarm_name">Alarm Name</string>
+    <string name="alarm_hint">Alarm</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="day_mon">MON</string>
+    <string name="day_tue">TUE</string>
+    <string name="day_wed">WED</string>
+    <string name="day_thu">THU</string>
+    <string name="day_fri">FRI</string>
+    <string name="day_sat">SAT</string>
+    <string name="day_sun">SUN</string>
 </resources>

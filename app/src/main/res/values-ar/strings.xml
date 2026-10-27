@@ -1,0 +1,38 @@
+<resources>
+    <string name="app_name">ألارمي</string>
+    <string name="menu_feedback">إرسال ملاحظات</string>
+    <string name="menu_diagnostics">إعدادات التقارير والتشخيص</string>
+    <string name="feedback_title">إرسال ملاحظات</string>
+    <string name="feedback_type_label">نوع الملاحظات</string>
+    <string name="feedback_type_bug">بلاغ عن خطأ</string>
+    <string name="feedback_type_suggestion">اقتراح ميزة</string>
+    <string name="feedback_type_general">ملاحظات عامة</string>
+    <string name="feedback_desc_hint">اكتب ملاحظتك أو اقتراحك هنا...</string>
+    <string name="feedback_email_hint">البريد الإلكتروني (اختياري)</string>
+    <string name="feedback_include_diagnostics">تضمين معلومات الجهاز الأساسية (إصدار التطبيق، نظام الأندرويد، نوع الجهاز)</string>
+    <string name="feedback_submit">إرسال الملاحظات</string>
+    <string name="feedback_success">شكراً لك! تم تجهيز ملاحظاتك للإرسال.</string>
+    <string name="feedback_error_empty">يرجى إدخال وصف لملاحظاتك.</string>
+    <string name="diagnostics_title">إعدادات التقارير والتشخيص</string>
+    <string name="diagnostics_desc">ساعدنا في تحسين التطبيق من خلال مشاركة تقارير الأعطال التشخيصية بشكل مجهول. يمكنك تفعيل أو تعطيل هذه الميزة في أي وقت.</string>
+    <string name="diagnostics_enable">تفعيل تقارير التشخيص</string>
+
+    <!-- Add / Edit Alarm Screen Strings -->
+    <string name="new_alarm">منبه جديد</string>
+    <string name="edit_alarm">تعديل المنبه</string>
+    <string name="repeat_days">أيام التكرار</string>
+    <string name="every_day">كل يوم</string>
+    <string name="once">مرة واحدة</string>
+    <string name="alarm_name">اسم المنبه</string>
+    <string name="alarm_hint">المنبه</string>
+    <string name="save">حفظ</string>
+    <string name="cancel">إلغاء</string>
+
+    <string name="day_mon">ن</string>
+    <string name="day_tue">ث</string>
+    <string name="day_wed">ع</string>
+    <string name="day_thu">خ</string>
+    <string name="day_fri">ج</string>
+    <string name="day_sat">س</string>
+    <string name="day_sun">ح</string>
+</resources>

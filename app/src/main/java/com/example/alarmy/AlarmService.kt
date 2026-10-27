@@ -67,6 +67,26 @@ class AlarmService : Service() {
 
         val notifId = if (alarmId != -1) alarmId else 1001
 
+        // Handle repeat days vs one-time alarm scheduling when ringing
+        if (alarmId != -1) {
+            val storage = AlarmStorage(this)
+            val alarms = storage.getAlarms().toMutableList()
+            val index = alarms.indexOfFirst { it.id == alarmId }
+            if (index != -1) {
+                val alarm = alarms[index]
+                if (alarm.daysOfWeek.isNotEmpty()) {
+                    // Repeating alarm: schedule next occurrence
+                    AlarmScheduler.scheduleAlarm(this, alarm)
+                } else {
+                    // One-time alarm: auto-disable so it doesn't ring again tomorrow
+                    val updated = alarm.copy(isEnabled = false)
+                    alarms[index] = updated
+                    storage.saveAlarms(alarms)
+                    AlarmScheduler.cancelAlarm(this, updated)
+                }
+            }
+        }
+
         val ringingIntent = Intent(this, AlarmRingingActivity::class.java).apply {
             putExtra(EXTRA_ALARM_ID, alarmId)
             putExtra(EXTRA_ALARM_LABEL, label)

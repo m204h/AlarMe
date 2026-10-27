@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "980239841315",
+    "project_id": "alarme-9935f",
+    "storage_bucket": "alarme-9935f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980239841315:android:c5cf71ce3ba79096785996",
+        "android_client_info": {
+          "package_name": "com.example.alarmy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApPU52SHkeP5BDHExljx_fu4E7EBHVQPM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -3,7 +3,6 @@ package com.example.alarmy
 import android.Manifest
 import android.app.AlarmManager
 import android.app.NotificationManager
-import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -11,7 +10,8 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
-import android.widget.EditText
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -20,7 +20,6 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
 
@@ -31,6 +30,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var storage: AlarmStorage
     private lateinit var adapter: AlarmAdapter
     private lateinit var alarms: MutableList<Alarm>
+    private lateinit var diagnosticManager: DiagnosticManager
 
     private val REQUEST_CODE_NOTIFICATION_PERM = 101
     private var isCheckingPermissions = false
@@ -38,6 +38,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        diagnosticManager = DiagnosticManager(this)
+        diagnosticManager.logMessage("MainActivity onCreate")
 
         storage = AlarmStorage(this)
         alarms = storage.getAlarms().toMutableList()
@@ -65,14 +68,37 @@ class MainActivity : AppCompatActivity() {
                 showDeleteDialog(alarm)
             },
             onEdit = { alarm ->
-                showAddEditDialog(alarm)
+                val intent = Intent(this, AddEditAlarmActivity::class.java).apply {
+                    putExtra("EXTRA_ALARM_ID", alarm.id)
+                }
+                startActivity(intent)
             }
         )
         recyclerView.adapter = adapter
 
         val fabAdd = findViewById<FloatingActionButton>(R.id.fabAddAlarm)
         fabAdd.setOnClickListener {
-            showAddEditDialog(null)
+            val intent = Intent(this, AddEditAlarmActivity::class.java)
+            startActivity(intent)
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_feedback -> {
+                FeedbackDialog.show(this, diagnosticManager)
+                true
+            }
+            R.id.action_diagnostics -> {
+                DiagnosticsSettingsDialog.show(this, diagnosticManager)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
 
@@ -85,13 +111,12 @@ class MainActivity : AppCompatActivity() {
     private fun checkAndSetupPermissions() {
         if (isCheckingPermissions) return
 
-        // Step 1: Notification Permission (Android 13+ / API 33+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 isCheckingPermissions = true
                 AlertDialog.Builder(this)
                     .setTitle("Notification Permission Needed")
-                    .setMessage("Notification permission is required so Alarmy can alert you when an alarm fires.")
+                    .setMessage("Notification permission is required so AlarMe can alert you when an alarm fires.")
                     .setCancelable(false)
                     .setPositiveButton("Allow") { _, _ ->
                         isCheckingPermissions = false
@@ -114,14 +139,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkNextPermissionStep2() {
-        // Step 2: Exact Alarm Permission (Android 12+ / API 31+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val alarmManager = getSystemService(AlarmManager::class.java)
             if (!alarmManager.canScheduleExactAlarms()) {
                 isCheckingPermissions = true
                 AlertDialog.Builder(this)
                     .setTitle("Exact Alarm Permission Needed")
-                    .setMessage("Alarmy needs Exact Alarm access to trigger alarms precisely on time.")
+                    .setMessage("AlarMe needs Exact Alarm access to trigger alarms precisely on time.")
                     .setCancelable(false)
                     .setPositiveButton("Open Settings") { _, _ ->
                         isCheckingPermissions = false
@@ -144,7 +168,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkNextPermissionStep3() {
-        // Step 3: Full-Screen Intent Permission (Android 14+ / API 34+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val notificationManager = getSystemService(NotificationManager::class.java)
             if (!notificationManager.canUseFullScreenIntent()) {
@@ -203,57 +226,6 @@ class MainActivity : AppCompatActivity() {
                 AlarmScheduler.scheduleAlarm(this, alarm)
             }
         }
-    }
-
-    private fun showAddEditDialog(existingAlarm: Alarm?) {
-        val calendar = Calendar.getInstance()
-        val initHour = existingAlarm?.hour ?: calendar.get(Calendar.HOUR_OF_DAY)
-        val initMinute = existingAlarm?.minute ?: calendar.get(Calendar.MINUTE)
-
-        TimePickerDialog(this, { _, hourOfDay, minute ->
-            val labelDialogView = layoutInflater.inflate(R.layout.dialog_alarm_label, null)
-            val etLabel = labelDialogView.findViewById<EditText>(R.id.etAlarmLabel)
-            if (existingAlarm != null) {
-                etLabel.setText(existingAlarm.label)
-            }
-
-            AlertDialog.Builder(this)
-                .setTitle(if (existingAlarm == null) "Add Alarm" else "Edit Alarm")
-                .setView(labelDialogView)
-                .setPositiveButton("Save") { _, _ ->
-                    val labelText = etLabel.text.toString().ifBlank { "Alarm" }
-                    if (existingAlarm == null) {
-                        val newId = (System.currentTimeMillis() % 1_000_000_000).toInt()
-                        val newAlarm = Alarm(
-                            id = if (newId < 0) -newId else newId,
-                            hour = hourOfDay,
-                            minute = minute,
-                            isEnabled = true,
-                            label = labelText
-                        )
-                        alarms.add(newAlarm)
-                        storage.saveAlarms(alarms)
-                        AlarmScheduler.scheduleAlarm(this, newAlarm)
-                    } else {
-                        val index = alarms.indexOfFirst { it.id == existingAlarm.id }
-                        if (index != -1) {
-                            val updated = existingAlarm.copy(
-                                hour = hourOfDay,
-                                minute = minute,
-                                isEnabled = true,
-                                label = labelText
-                            )
-                            alarms[index] = updated
-                            storage.saveAlarms(alarms)
-                            AlarmScheduler.scheduleAlarm(this, updated)
-                        }
-                    }
-                    adapter.updateAlarms(alarms)
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
-
-        }, initHour, initMinute, true).show()
     }
 
     private fun showDeleteDialog(alarm: Alarm) {

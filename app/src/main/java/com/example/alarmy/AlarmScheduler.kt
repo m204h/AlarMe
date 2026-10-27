@@ -42,8 +42,35 @@ object AlarmScheduler {
             set(Calendar.MILLISECOND, 0)
         }
 
-        if (calendar.timeInMillis <= System.currentTimeMillis()) {
-            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        val nowMillis = System.currentTimeMillis()
+
+        if (alarm.daysOfWeek.isEmpty()) {
+            if (calendar.timeInMillis <= nowMillis) {
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+            }
+        } else {
+            var found = false
+            for (i in 0..7) {
+                val targetCal = Calendar.getInstance().apply {
+                    timeInMillis = nowMillis
+                    add(Calendar.DAY_OF_YEAR, i)
+                    set(Calendar.HOUR_OF_DAY, alarm.hour)
+                    set(Calendar.MINUTE, alarm.minute)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                val dayOfWeek = targetCal.get(Calendar.DAY_OF_WEEK)
+                if (targetCal.timeInMillis > nowMillis && alarm.daysOfWeek.contains(dayOfWeek)) {
+                    calendar.timeInMillis = targetCal.timeInMillis
+                    found = true
+                    break
+                }
+            }
+            if (!found) {
+                if (calendar.timeInMillis <= nowMillis) {
+                    calendar.add(Calendar.DAY_OF_YEAR, 1)
+                }
+            }
         }
 
         val timeFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())

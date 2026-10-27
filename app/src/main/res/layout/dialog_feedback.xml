@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feedback_type_label"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"/>
+
+    <RadioGroup
+        android:id="@+id/radioGroupType"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="12dp">
+
+        <RadioButton
+            android:id="@+id/radioBug"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/feedback_type_bug"
+            android:checked="true"/>
+
+        <RadioButton
+            android:id="@+id/radioSuggestion"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/feedback_type_suggestion"/>
+
+        <RadioButton
+            android:id="@+id/radioGeneral"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/feedback_type_general"/>
+
+    </RadioGroup>
+
+    <EditText
+        android:id="@+id/etFeedbackDesc"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:hint="@string/feedback_desc_hint"
+        android:gravity="top|start"
+        android:inputType="textMultiLine"
+        android:layout_marginBottom="12dp"
+        android:autofillHints="description"/>
+
+    <EditText
+        android:id="@+id/etFeedbackEmail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/feedback_email_hint"
+        android:inputType="textEmailAddress"
+        android:layout_marginBottom="12dp"
+        android:autofillHints="emailAddress"/>
+
+    <CheckBox
+        android:id="@+id/cbIncludeDiagnostics"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feedback_include_diagnostics"
+        android:checked="true"
+        android:textSize="12sp"
+        android:layout_marginBottom="16dp"/>
+
+    <ProgressBar
+        android:id="@+id/pbSubmitting"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:visibility="gone"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/btnSubmitFeedback"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/feedback_submit"/>
+
+</LinearLayout>
