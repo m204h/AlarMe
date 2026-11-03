@@ -10,6 +10,7 @@ import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.Vibrator
@@ -67,6 +68,8 @@ class AlarmService : Service() {
 
         val notifId = if (alarmId != -1) alarmId else 1001
 
+        var customSoundUri = ""
+
         // Handle repeat days vs one-time alarm scheduling when ringing
         if (alarmId != -1) {
             val storage = AlarmStorage(this)
@@ -74,11 +77,10 @@ class AlarmService : Service() {
             val index = alarms.indexOfFirst { it.id == alarmId }
             if (index != -1) {
                 val alarm = alarms[index]
+                customSoundUri = alarm.soundUri
                 if (alarm.daysOfWeek.isNotEmpty()) {
-                    // Repeating alarm: schedule next occurrence
                     AlarmScheduler.scheduleAlarm(this, alarm)
                 } else {
-                    // One-time alarm: auto-disable so it doesn't ring again tomorrow
                     val updated = alarm.copy(isEnabled = false)
                     alarms[index] = updated
                     storage.saveAlarms(alarms)
@@ -151,7 +153,7 @@ class AlarmService : Service() {
             Log.e(TAG, "Error in startForeground", e)
         }
 
-        startAudioAndVibration()
+        startAudioAndVibration(customSoundUri)
 
         try {
             startActivity(ringingIntent)
@@ -161,11 +163,20 @@ class AlarmService : Service() {
         }
     }
 
-    private fun startAudioAndVibration() {
+    private fun startAudioAndVibration(soundUriStr: String) {
         if (mediaPlayer == null) {
             try {
-                val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                val alarmUri = if (soundUriStr.isNotEmpty()) {
+                    try {
+                        val parsed = Uri.parse(soundUriStr)
+                        val ringtone = RingtoneManager.getRingtone(applicationContext, parsed)
+                        if (ringtone != null) parsed else RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    } catch (e: Exception) {
+                        RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    }
+                } else {
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                } ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
                 val audioAttributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
@@ -179,9 +190,26 @@ class AlarmService : Service() {
                     prepare()
                     start()
                 }
-                Log.d(TAG, "Started MediaPlayer with USAGE_ALARM")
+                Log.d(TAG, "Started MediaPlayer with Uri: $alarmUri")
             } catch (e: Exception) {
-                Log.e(TAG, "Error starting MediaPlayer", e)
+                Log.e(TAG, "Error starting MediaPlayer with custom Uri, falling back to default", e)
+                try {
+                    val defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    val audioAttributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                    mediaPlayer = MediaPlayer().apply {
+                        setAudioAttributes(audioAttributes)
+                        setDataSource(applicationContext, defaultUri)
+                        isLooping = true
+                        prepare()
+                        start()
+                    }
+                } catch (e2: Exception) {
+                    Log.e(TAG, "Error starting fallback MediaPlayer", e2)
+                }
             }
         }
 

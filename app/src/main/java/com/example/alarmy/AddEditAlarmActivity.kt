@@ -1,15 +1,26 @@
 package com.example.alarmy
 
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.TimePicker
 import android.widget.ToggleButton
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import java.util.Calendar
 
 class AddEditAlarmActivity : AppCompatActivity() {
+
+    companion object {
+        private const val TAG = "AddEditAlarmActivity"
+    }
 
     private lateinit var timePicker: TimePicker
     private lateinit var etAlarmLabel: EditText
@@ -28,11 +39,20 @@ class AddEditAlarmActivity : AppCompatActivity() {
     private lateinit var btnEveryDay: Button
     private lateinit var btnOnce: Button
 
+    private lateinit var layoutSelectSound: LinearLayout
+    private lateinit var tvSelectedSound: TextView
+
     private var alarmId: Int = -1
     private var existingAlarm: Alarm? = null
 
+    private var selectedSoundUri: String = ""
+    private var previewMediaPlayer: MediaPlayer? = null
+
+    data class SystemSound(val title: String, val uri: String)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        supportActionBar?.hide()
         setContentView(R.layout.activity_add_edit_alarm)
 
         timePicker = findViewById(R.id.timePicker)
@@ -52,6 +72,9 @@ class AddEditAlarmActivity : AppCompatActivity() {
         btnEveryDay = findViewById(R.id.btnEveryDay)
         btnOnce = findViewById(R.id.btnOnce)
 
+        layoutSelectSound = findViewById(R.id.layoutSelectSound)
+        tvSelectedSound = findViewById(R.id.tvSelectedSound)
+
         alarmId = intent.getIntExtra("EXTRA_ALARM_ID", -1)
         val storage = AlarmStorage(this)
 
@@ -61,13 +84,13 @@ class AddEditAlarmActivity : AppCompatActivity() {
 
         timePicker.setIs24HourView(android.text.format.DateFormat.is24HourFormat(this))
 
-        if (existingAlarm != null) {
+        existingAlarm?.let { alarm ->
             tvTitle.setText(R.string.edit_alarm)
-            timePicker.hour = existingAlarm!!.hour
-            timePicker.minute = existingAlarm!!.minute
-            etAlarmLabel.setText(existingAlarm!!.label)
+            timePicker.hour = alarm.hour
+            timePicker.minute = alarm.minute
+            etAlarmLabel.setText(alarm.label)
 
-            val days = existingAlarm!!.daysOfWeek
+            val days = alarm.daysOfWeek
             btnMon.isChecked = days.contains(Calendar.MONDAY)
             btnTue.isChecked = days.contains(Calendar.TUESDAY)
             btnWed.isChecked = days.contains(Calendar.WEDNESDAY)
@@ -75,41 +98,34 @@ class AddEditAlarmActivity : AppCompatActivity() {
             btnFri.isChecked = days.contains(Calendar.FRIDAY)
             btnSat.isChecked = days.contains(Calendar.SATURDAY)
             btnSun.isChecked = days.contains(Calendar.SUNDAY)
-        } else {
+
+            selectedSoundUri = alarm.soundUri
+        } ?: run {
             tvTitle.setText(R.string.new_alarm)
             val calendar = Calendar.getInstance()
             timePicker.hour = calendar.get(Calendar.HOUR_OF_DAY)
             timePicker.minute = calendar.get(Calendar.MINUTE)
             etAlarmLabel.setText(getString(R.string.alarm_hint))
+            selectedSoundUri = ""
         }
 
-        btnEveryDay.setOnClickListener {
-            val check = true
-            btnMon.isChecked = check
-            btnTue.isChecked = check
-            btnWed.isChecked = check
-            btnThu.isChecked = check
-            btnFri.isChecked = check
-            btnSat.isChecked = check
-            btnSun.isChecked = check
+        updateSelectedSoundDisplay()
+
+        layoutSelectSound.setOnClickListener {
+            showSoundSelectionDialog()
         }
 
-        btnOnce.setOnClickListener {
-            val check = false
-            btnMon.isChecked = check
-            btnTue.isChecked = check
-            btnWed.isChecked = check
-            btnThu.isChecked = check
-            btnFri.isChecked = check
-            btnSat.isChecked = check
-            btnSun.isChecked = check
-        }
+        btnEveryDay.setOnClickListener { setAllDaysChecked(true) }
+        btnOnce.setOnClickListener { setAllDaysChecked(false) }
 
         btnCancel.setOnClickListener {
+            stopPreviewSound()
             finish()
         }
 
         btnSave.setOnClickListener {
+            stopPreviewSound()
+
             val hour = timePicker.hour
             val minute = timePicker.minute
             val defaultLabel = getString(R.string.alarm_hint)
@@ -126,36 +142,164 @@ class AddEditAlarmActivity : AppCompatActivity() {
 
             val alarms = storage.getAlarms().toMutableList()
 
-            if (existingAlarm == null) {
-                val newId = (System.currentTimeMillis() % 1_000_000_000).toInt()
-                val newAlarm = Alarm(
-                    id = if (newId < 0) -newId else newId,
+            val alarmToSave = existingAlarm?.copy(
+                hour = hour,
+                minute = minute,
+                isEnabled = true,
+                label = label,
+                daysOfWeek = daysOfWeek,
+                soundUri = selectedSoundUri
+            ) ?: run {
+                val newId = (System.currentTimeMillis() % 1_000_000_000).toInt().let { if (it < 0) -it else it }
+                Alarm(
+                    id = newId,
                     hour = hour,
                     minute = minute,
                     isEnabled = true,
                     label = label,
-                    daysOfWeek = daysOfWeek
+                    daysOfWeek = daysOfWeek,
+                    soundUri = selectedSoundUri
                 )
-                alarms.add(newAlarm)
-                storage.saveAlarms(alarms)
-                AlarmScheduler.scheduleAlarm(this, newAlarm)
-            } else {
-                val index = alarms.indexOfFirst { it.id == existingAlarm!!.id }
-                if (index != -1) {
-                    val updated = existingAlarm!!.copy(
-                        hour = hour,
-                        minute = minute,
-                        isEnabled = true,
-                        label = label,
-                        daysOfWeek = daysOfWeek
-                    )
-                    alarms[index] = updated
-                    storage.saveAlarms(alarms)
-                    AlarmScheduler.scheduleAlarm(this, updated)
-                }
             }
+
+            val index = alarms.indexOfFirst { it.id == alarmToSave.id }
+            if (index != -1) {
+                alarms[index] = alarmToSave
+            } else {
+                alarms.add(alarmToSave)
+            }
+
+            storage.saveAlarms(alarms)
+            AlarmScheduler.scheduleAlarm(this, alarmToSave)
 
             finish()
         }
+    }
+
+    private fun setAllDaysChecked(checked: Boolean) {
+        btnMon.isChecked = checked
+        btnTue.isChecked = checked
+        btnWed.isChecked = checked
+        btnThu.isChecked = checked
+        btnFri.isChecked = checked
+        btnSat.isChecked = checked
+        btnSun.isChecked = checked
+    }
+
+    private fun getAvailableSystemAlarmSounds(): List<SystemSound> {
+        val sounds = mutableListOf<SystemSound>()
+        val defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+        val defaultTitle = getString(R.string.default_alarm_sound)
+
+        sounds.add(SystemSound(defaultTitle, defaultUri?.toString() ?: ""))
+
+        try {
+            val rm = RingtoneManager(this).apply {
+                setType(RingtoneManager.TYPE_ALARM)
+            }
+            val cursor = rm.cursor
+            while (cursor != null && cursor.moveToNext()) {
+                val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
+                val uri = rm.getRingtoneUri(cursor.position)
+                if (uri != null && uri.toString() != defaultUri?.toString()) {
+                    sounds.add(SystemSound(title ?: "Alarm Sound", uri.toString()))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying system alarm sounds via RingtoneManager", e)
+        }
+
+        return sounds
+    }
+
+    private fun updateSelectedSoundDisplay() {
+        if (selectedSoundUri.isEmpty()) {
+            tvSelectedSound.setText(R.string.default_alarm_sound)
+            return
+        }
+
+        try {
+            val defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            if (selectedSoundUri == defaultUri?.toString()) {
+                tvSelectedSound.setText(R.string.default_alarm_sound)
+                return
+            }
+
+            val uri = Uri.parse(selectedSoundUri)
+            val ringtone = RingtoneManager.getRingtone(this, uri)
+            val title = ringtone?.getTitle(this)
+            if (!title.isNullOrEmpty()) {
+                tvSelectedSound.text = title
+            } else {
+                tvSelectedSound.setText(R.string.default_alarm_sound)
+            }
+        } catch (e: Exception) {
+            tvSelectedSound.setText(R.string.default_alarm_sound)
+        }
+    }
+
+    private fun showSoundSelectionDialog() {
+        val sounds = getAvailableSystemAlarmSounds()
+        val titles = sounds.map { it.title }.toTypedArray()
+
+        var selectedIndex = sounds.indexOfFirst { it.uri == selectedSoundUri }
+        if (selectedIndex == -1) selectedIndex = 0
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.select_alarm_sound)
+            .setSingleChoiceItems(titles, selectedIndex) { _, which ->
+                selectedIndex = which
+                val chosenSound = sounds[which]
+                previewSound(chosenSound.uri)
+            }
+            .setPositiveButton("OK") { _, _ ->
+                stopPreviewSound()
+                selectedSoundUri = sounds[selectedIndex].uri
+                updateSelectedSoundDisplay()
+            }
+            .setNegativeButton(R.string.cancel) { _, _ ->
+                stopPreviewSound()
+            }
+            .setOnDismissListener {
+                stopPreviewSound()
+            }
+            .show()
+    }
+
+    private fun previewSound(uriStr: String) {
+        stopPreviewSound()
+        if (uriStr.isEmpty()) return
+
+        try {
+            val uri = Uri.parse(uriStr)
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
+            previewMediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(audioAttributes)
+                setDataSource(applicationContext, uri)
+                prepare()
+                start()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error previewing sound: $uriStr", e)
+        }
+    }
+
+    private fun stopPreviewSound() {
+        try {
+            previewMediaPlayer?.stop()
+            previewMediaPlayer?.release()
+            previewMediaPlayer = null
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopPreviewSound()
     }
 }

@@ -37,7 +37,8 @@ class AlarmStorage(context: Context) {
                         minute = obj.getInt("minute"),
                         isEnabled = obj.getBoolean("isEnabled"),
                         label = obj.optString("label", "Alarm"),
-                        daysOfWeek = daysList
+                        daysOfWeek = daysList,
+                        soundUri = obj.optString("soundUri", "")
                     )
                 )
             }
@@ -57,6 +58,7 @@ class AlarmStorage(context: Context) {
                 put("isEnabled", alarm.isEnabled)
                 put("label", alarm.label)
                 put("daysOfWeek", JSONArray(alarm.daysOfWeek))
+                put("soundUri", alarm.soundUri)
             }
             jsonArray.put(obj)
         }

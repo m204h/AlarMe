@@ -56,7 +56,6 @@ object FeedbackDialog {
                 else -> "General Feedback"
             }
 
-            // Build Firestore Document Payload
             val feedbackData = mutableMapOf<String, Any>(
                 "type" to typeStr,
                 "message" to desc,
@@ -74,7 +73,6 @@ object FeedbackDialog {
                 feedbackData["deviceModel"] = "${Build.MANUFACTURER} ${Build.MODEL}"
             }
 
-            // Show Loading State
             pbSubmitting.visibility = View.VISIBLE
             btnSubmit.isEnabled = false
             etDescription.isEnabled = false
@@ -84,7 +82,6 @@ object FeedbackDialog {
                 radioGroupType.getChildAt(i).isEnabled = false
             }
 
-            // Submit directly to Cloud Firestore 'feedback' collection
             val db = FirebaseFirestore.getInstance()
             db.collection("feedback")
                 .add(feedbackData)

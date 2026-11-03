@@ -66,7 +66,7 @@ class DiagnosticManager(context: Context) {
         }
     }
 
-    fun getDiagnosticSummary(context: Context): String {
+    fun getDiagnosticSummary(): String {
         return buildString {
             append("App Version: 1.0 (1)\n")
             append("Android Version: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})\n")

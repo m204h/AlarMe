@@ -25,6 +25,9 @@
     <string name="once">مرة واحدة</string>
     <string name="alarm_name">اسم المنبه</string>
     <string name="alarm_hint">المنبه</string>
+    <string name="alarm_sound">صوت المنبه</string>
+    <string name="default_alarm_sound">صوت المنبه الافتراضي</string>
+    <string name="select_alarm_sound">اختر صوت المنبه</string>
     <string name="save">حفظ</string>
     <string name="cancel">إلغاء</string>
 
