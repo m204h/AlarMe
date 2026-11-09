@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import androidx.core.content.ContextCompat
 
 class AlarmActionReceiver : BroadcastReceiver() {
 
@@ -24,6 +25,10 @@ class AlarmActionReceiver : BroadcastReceiver() {
             putExtra(AlarmService.EXTRA_ALARM_LABEL, label)
         }
 
-        context.startService(serviceIntent)
+        try {
+            ContextCompat.startForegroundService(context, serviceIntent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting AlarmService for action=$action", e)
+        }
     }
 }

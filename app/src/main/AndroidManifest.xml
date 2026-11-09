@@ -37,7 +37,14 @@
             android:exported="false" />
 
         <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="@string/menu_settings"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
             android:name=".AlarmRingingActivity"
+            android:directBootAware="true"
             android:exported="false"
             android:launchMode="singleTop"
             android:showWhenLocked="true"
@@ -46,23 +53,32 @@
 
         <service
             android:name=".AlarmService"
+            android:directBootAware="true"
             android:exported="false"
             android:foregroundServiceType="systemExempted|mediaPlayback" />
 
         <receiver
             android:name=".AlarmReceiver"
+            android:directBootAware="true"
             android:exported="false" />
 
         <receiver
             android:name=".AlarmActionReceiver"
+            android:directBootAware="true"
             android:exported="false" />
 
         <receiver
             android:name=".BootReceiver"
+            android:directBootAware="true"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.USER_UNLOCKED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>

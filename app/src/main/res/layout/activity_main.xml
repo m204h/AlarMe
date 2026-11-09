@@ -13,9 +13,10 @@
         android:padding="16dp">
 
         <TextView
+            android:id="@+id/tvAlarmHeading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Alarm"
+            android:text="@string/no_alarm"
             android:textSize="28sp"
             android:textStyle="bold"
             android:paddingBottom="16dp"/>

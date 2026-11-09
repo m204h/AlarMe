@@ -1,5 +1,6 @@
 package com.example.alarmy
 
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
@@ -12,6 +13,9 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.TimePicker
 import android.widget.ToggleButton
+import android.provider.OpenableColumns
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import java.util.Calendar
@@ -47,6 +51,9 @@ class AddEditAlarmActivity : AppCompatActivity() {
 
     private var selectedSoundUri: String = ""
     private var previewMediaPlayer: MediaPlayer? = null
+    private val audioPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) handlePickedAudio(uri)
+    }
 
     data class SystemSound(val title: String, val uri: String)
 
@@ -162,15 +169,18 @@ class AddEditAlarmActivity : AppCompatActivity() {
                 )
             }
 
-            val index = alarms.indexOfFirst { it.id == alarmToSave.id }
+            val calculatedTriggerTime = AlarmScheduler.calculateNextTriggerTime(alarmToSave, isNewOrUserEdit = true)
+            val finalAlarm = alarmToSave.copy(triggerTimeMillis = calculatedTriggerTime)
+
+            val index = alarms.indexOfFirst { it.id == finalAlarm.id }
             if (index != -1) {
-                alarms[index] = alarmToSave
+                alarms[index] = finalAlarm
             } else {
-                alarms.add(alarmToSave)
+                alarms.add(finalAlarm)
             }
 
             storage.saveAlarms(alarms)
-            AlarmScheduler.scheduleAlarm(this, alarmToSave)
+            AlarmScheduler.scheduleAlarm(this, finalAlarm)
 
             finish()
         }
@@ -197,12 +207,13 @@ class AddEditAlarmActivity : AppCompatActivity() {
             val rm = RingtoneManager(this).apply {
                 setType(RingtoneManager.TYPE_ALARM)
             }
-            val cursor = rm.cursor
-            while (cursor != null && cursor.moveToNext()) {
-                val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
-                val uri = rm.getRingtoneUri(cursor.position)
-                if (uri != null && uri.toString() != defaultUri?.toString()) {
-                    sounds.add(SystemSound(title ?: "Alarm Sound", uri.toString()))
+            rm.cursor?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
+                    val uri = rm.getRingtoneUri(cursor.position)
+                    if (uri != null && uri.toString() != defaultUri?.toString()) {
+                        sounds.add(SystemSound(title ?: "Alarm Sound", uri.toString()))
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -219,51 +230,77 @@ class AddEditAlarmActivity : AppCompatActivity() {
         }
 
         try {
+            val uri = Uri.parse(selectedSoundUri)
             val defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             if (selectedSoundUri == defaultUri?.toString()) {
                 tvSelectedSound.setText(R.string.default_alarm_sound)
-                return
-            }
-
-            val uri = Uri.parse(selectedSoundUri)
-            val ringtone = RingtoneManager.getRingtone(this, uri)
-            val title = ringtone?.getTitle(this)
-            if (!title.isNullOrEmpty()) {
-                tvSelectedSound.text = title
+            } else if (uri.scheme == "content" && uri.authority != "settings") {
+                tvSelectedSound.text = queryAudioName(uri) ?: getString(R.string.custom_audio_unavailable)
             } else {
-                tvSelectedSound.setText(R.string.default_alarm_sound)
+                val title = RingtoneManager.getRingtone(this, uri)?.getTitle(this)
+                tvSelectedSound.text = title ?: getString(R.string.default_alarm_sound)
             }
         } catch (e: Exception) {
-            tvSelectedSound.setText(R.string.default_alarm_sound)
+            tvSelectedSound.setText(R.string.custom_audio_unavailable)
         }
     }
 
     private fun showSoundSelectionDialog() {
         val sounds = getAvailableSystemAlarmSounds()
-        val titles = sounds.map { it.title }.toTypedArray()
-
-        var selectedIndex = sounds.indexOfFirst { it.uri == selectedSoundUri }
-        if (selectedIndex == -1) selectedIndex = 0
-
+        val titles = (sounds.map { it.title } + getString(R.string.choose_from_device)).toTypedArray()
+        var selectedIndex = sounds.indexOfFirst { it.uri == selectedSoundUri }.coerceAtLeast(0)
         AlertDialog.Builder(this)
             .setTitle(R.string.select_alarm_sound)
-            .setSingleChoiceItems(titles, selectedIndex) { _, which ->
-                selectedIndex = which
-                val chosenSound = sounds[which]
-                previewSound(chosenSound.uri)
+            .setSingleChoiceItems(titles, selectedIndex) { currentDialog, which ->
+                if (which == sounds.size) {
+                    stopPreviewSound()
+                    currentDialog.dismiss()
+                    audioPicker.launch(arrayOf("audio/*"))
+                } else {
+                    selectedIndex = which
+                    previewSound(sounds[which].uri)
+                }
             }
             .setPositiveButton("OK") { _, _ ->
                 stopPreviewSound()
                 selectedSoundUri = sounds[selectedIndex].uri
                 updateSelectedSoundDisplay()
             }
-            .setNegativeButton(R.string.cancel) { _, _ ->
-                stopPreviewSound()
-            }
-            .setOnDismissListener {
-                stopPreviewSound()
-            }
+            .setNegativeButton(R.string.cancel) { _, _ -> stopPreviewSound() }
+            .setOnDismissListener { stopPreviewSound() }
             .show()
+    }
+
+    private fun handlePickedAudio(uri: Uri) {
+        try {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            previewSound(uri.toString())
+            if (previewMediaPlayer == null) return
+            AlertDialog.Builder(this)
+                .setTitle(queryAudioName(uri) ?: getString(R.string.custom_audio))
+                .setMessage(R.string.preview_custom_audio)
+                .setPositiveButton(R.string.use_this_sound) { _, _ ->
+                    stopPreviewSound()
+                    selectedSoundUri = uri.toString()
+                    updateSelectedSoundDisplay()
+                }
+                .setNegativeButton(R.string.cancel) { _, _ -> stopPreviewSound() }
+                .setOnCancelListener { stopPreviewSound() }
+                .show()
+        } catch (e: Exception) {
+            stopPreviewSound()
+            Toast.makeText(this, R.string.custom_audio_unavailable, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun queryAudioName(uri: Uri): String? {
+        return try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun previewSound(uriStr: String) {

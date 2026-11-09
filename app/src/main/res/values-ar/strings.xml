@@ -1,21 +1,11 @@
 <resources>
     <string name="app_name">ألارمي</string>
-    <string name="menu_feedback">إرسال ملاحظات</string>
-    <string name="menu_diagnostics">إعدادات التقارير والتشخيص</string>
-    <string name="feedback_title">إرسال ملاحظات</string>
-    <string name="feedback_type_label">نوع الملاحظات</string>
-    <string name="feedback_type_bug">بلاغ عن خطأ</string>
-    <string name="feedback_type_suggestion">اقتراح ميزة</string>
-    <string name="feedback_type_general">ملاحظات عامة</string>
-    <string name="feedback_desc_hint">اكتب ملاحظتك أو اقتراحك هنا...</string>
-    <string name="feedback_email_hint">البريد الإلكتروني (اختياري)</string>
-    <string name="feedback_include_diagnostics">تضمين معلومات الجهاز الأساسية (إصدار التطبيق، نظام الأندرويد، نوع الجهاز)</string>
-    <string name="feedback_submit">إرسال الملاحظات</string>
-    <string name="feedback_success">شكراً لك! تم تجهيز ملاحظاتك للإرسال.</string>
-    <string name="feedback_error_empty">يرجى إدخال وصف لملاحظاتك.</string>
-    <string name="diagnostics_title">إعدادات التقارير والتشخيص</string>
-    <string name="diagnostics_desc">ساعدنا في تحسين التطبيق من خلال مشاركة تقارير الأعطال التشخيصية بشكل مجهول. يمكنك تفعيل أو تعطيل هذه الميزة في أي وقت.</string>
-    <string name="diagnostics_enable">تفعيل تقارير التشخيص</string>
+    <string name="menu_settings">الإعدادات</string>
+    <string name="no_alarm">لا توجد منبهات</string>
+    <string name="website_title">Contact Me</string>
+    <string name="website_desc">The official website for the AlarMe developer</string>
+    <string name="no_browser_available">لا يتوفر متصفح ويب لفتح الموقع</string>
+    <string name="website_url_not_configured">رابط الموقع غير محدد</string>
 
     <!-- Add / Edit Alarm Screen Strings -->
     <string name="new_alarm">منبه جديد</string>
@@ -28,8 +18,17 @@
     <string name="alarm_sound">صوت المنبه</string>
     <string name="default_alarm_sound">صوت المنبه الافتراضي</string>
     <string name="select_alarm_sound">اختر صوت المنبه</string>
+    <string name="choose_from_device">اختيار من الجهاز</string>
+    <string name="custom_audio">صوت مخصص</string>
+    <string name="custom_audio_unavailable">الصوت المحدد غير متاح. اختر صوتاً آخر أو استخدم صوت النظام.</string>
+    <string name="preview_custom_audio">استمع إلى الصوت ثم اختر استخدام هذا الصوت للتأكيد.</string>
+    <string name="use_this_sound">استخدام هذا الصوت</string>
     <string name="save">حفظ</string>
     <string name="cancel">إلغاء</string>
+    <string name="ok">موافق</string>
+    <string name="delete">حذف</string>
+    <string name="delete_alarm_title">حذف المنبه</string>
+    <string name="delete_alarm_message">هل أنت تأكد من رغبتك في حذف هذا المنبه؟</string>
 
     <string name="day_mon">ن</string>
     <string name="day_tue">ث</string>

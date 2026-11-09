@@ -11,6 +11,14 @@
         <item name="colorOnSecondary">@color/black</item>
         <!-- Status bar color. -->
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
-        <!-- Customize your theme here. -->
+        <!-- Customize action bar overflow icon -->
+        <item name="actionOverflowButtonStyle">@style/HamburgerOverflowButtonStyle</item>
+    </style>
+
+    <style name="HamburgerOverflowButtonStyle" parent="Widget.AppCompat.ActionButton.Overflow">
+        <item name="android:src">@drawable/ic_hamburger</item>
+        <item name="srcCompat">@drawable/ic_hamburger</item>
+        <item name="android:tint">@android:color/white</item>
+        <item name="tint">@android:color/white</item>
     </style>
 </resources>

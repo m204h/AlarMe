@@ -5,13 +5,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.os.UserManagerCompat
 
 class AlarmRingingActivity : AppCompatActivity() {
 
@@ -34,11 +34,11 @@ class AlarmRingingActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
+        if (UserManagerCompat.isUserUnlocked(this)) {
             try {
-                val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+                val keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
                 keyguardManager.requestDismissKeyguard(this, null)
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to request dismiss keyguard", e)
@@ -48,8 +48,7 @@ class AlarmRingingActivity : AppCompatActivity() {
         window.addFlags(
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
         )
 
         setContentView(R.layout.activity_alarm_ringing)
@@ -86,11 +85,12 @@ class AlarmRingingActivity : AppCompatActivity() {
             finish()
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(dismissReceiver, IntentFilter("com.example.alarmy.ACTION_DISMISS_ALARM"), RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(dismissReceiver, IntentFilter("com.example.alarmy.ACTION_DISMISS_ALARM"))
-        }
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            dismissReceiver,
+            IntentFilter("com.example.alarmy.ACTION_DISMISS_ALARM"),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     override fun onDestroy() {

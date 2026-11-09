@@ -12,6 +12,8 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -30,7 +32,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var storage: AlarmStorage
     private lateinit var adapter: AlarmAdapter
     private lateinit var alarms: MutableList<Alarm>
-    private lateinit var diagnosticManager: DiagnosticManager
 
     private val REQUEST_CODE_NOTIFICATION_PERM = 101
     private var isCheckingPermissions = false
@@ -38,9 +39,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        diagnosticManager = DiagnosticManager(this)
-        diagnosticManager.logMessage("MainActivity onCreate")
 
         storage = AlarmStorage(this)
         alarms = storage.getAlarms().toMutableList()
@@ -53,7 +51,12 @@ class MainActivity : AppCompatActivity() {
             onToggle = { alarm, isEnabled ->
                 val index = alarms.indexOfFirst { it.id == alarm.id }
                 if (index != -1) {
-                    val updated = alarm.copy(isEnabled = isEnabled)
+                    val newTriggerTime = if (isEnabled) {
+                        AlarmScheduler.calculateNextTriggerTime(alarm.copy(isEnabled = true), isNewOrUserEdit = true)
+                    } else {
+                        0L
+                    }
+                    val updated = alarm.copy(isEnabled = isEnabled, triggerTimeMillis = newTriggerTime)
                     alarms[index] = updated
                     storage.saveAlarms(alarms)
                     if (isEnabled) {
@@ -62,6 +65,7 @@ class MainActivity : AppCompatActivity() {
                         AlarmScheduler.cancelAlarm(this, updated)
                     }
                     adapter.updateAlarms(alarms)
+                    updateHeading()
                 }
             },
             onDelete = { alarm ->
@@ -75,11 +79,22 @@ class MainActivity : AppCompatActivity() {
             }
         )
         recyclerView.adapter = adapter
+        updateHeading()
 
         val fabAdd = findViewById<FloatingActionButton>(R.id.fabAddAlarm)
         fabAdd.setOnClickListener {
             val intent = Intent(this, AddEditAlarmActivity::class.java)
             startActivity(intent)
+        }
+    }
+
+    private fun updateHeading() {
+        val tvHeading = findViewById<TextView>(R.id.tvAlarmHeading)
+        if (alarms.isEmpty()) {
+            tvHeading.text = getString(R.string.no_alarm)
+            tvHeading.visibility = View.VISIBLE
+        } else {
+            tvHeading.visibility = View.GONE
         }
     }
 
@@ -90,12 +105,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
-            R.id.action_feedback -> {
-                FeedbackDialog.show(this, diagnosticManager)
-                true
-            }
-            R.id.action_diagnostics -> {
-                DiagnosticsSettingsDialog.show(this, diagnosticManager)
+            R.id.action_settings -> {
+                val intent = Intent(this, SettingsActivity::class.java)
+                startActivity(intent)
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -151,7 +163,7 @@ class MainActivity : AppCompatActivity() {
                         isCheckingPermissions = false
                         try {
                             startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             Toast.makeText(this, "Please allow Exact Alarms in System Settings", Toast.LENGTH_LONG).show()
                         }
                     }
@@ -184,13 +196,13 @@ class MainActivity : AppCompatActivity() {
                                 Uri.parse("package:$packageName")
                             )
                             startActivity(intent)
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             try {
                                 val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
                                     putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
                                 }
                                 startActivity(intent)
-                            } catch (e2: Exception) {
+                            } catch (_: Exception) {
                                 Toast.makeText(this, "Please allow Full Screen Intents in Settings", Toast.LENGTH_LONG).show()
                             }
                         }
@@ -219,8 +231,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun syncAndRescheduleAlarms() {
+        storage.syncOnUnlock()
         alarms = storage.getAlarms().toMutableList()
         adapter.updateAlarms(alarms)
+        updateHeading()
         for (alarm in alarms) {
             if (alarm.isEnabled) {
                 AlarmScheduler.scheduleAlarm(this, alarm)
@@ -230,16 +244,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun showDeleteDialog(alarm: Alarm) {
         AlertDialog.Builder(this)
-            .setTitle("Delete Alarm")
-            .setMessage("Are you sure you want to delete this alarm?")
-            .setPositiveButton("Delete") { _, _ ->
+            .setTitle(R.string.delete_alarm_title)
+            .setMessage(R.string.delete_alarm_message)
+            .setPositiveButton(R.string.delete) { _, _ ->
                 AlarmScheduler.cancelAlarm(this, alarm)
                 alarms.removeAll { it.id == alarm.id }
                 storage.saveAlarms(alarms)
                 adapter.updateAlarms(alarms)
-                Toast.makeText(this, "Alarm deleted", Toast.LENGTH_SHORT).show()
+                updateHeading()
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
 }
