@@ -19,6 +19,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -39,6 +41,69 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        val mainLayout = findViewById<View>(R.id.mainLayout)
+        val actionBarContainer = window.decorView.findViewById<View>(androidx.appcompat.R.id.action_bar_container)
+
+        val actionBarHeight = android.util.TypedValue().let { value ->
+            if (theme.resolveAttribute(androidx.appcompat.R.attr.actionBarSize, value, true)) {
+                android.util.TypedValue.complexToDimensionPixelSize(value.data, resources.displayMetrics)
+            } else {
+                0
+            }
+        }
+
+        var startInset = 0
+        var endInset = 0
+        var bottomInset = 0
+        var statusBarTopInset = 0
+
+        fun updateContentPadding(view: View) {
+            val topPadding = if (actionBarContainer != null && actionBarContainer.height > 0) {
+                val actionBarLocation = IntArray(2)
+                val viewLocation = IntArray(2)
+                actionBarContainer.getLocationOnScreen(actionBarLocation)
+                view.getLocationOnScreen(viewLocation)
+                val actionBarBottom = actionBarLocation[1] + actionBarContainer.height
+                val viewTop = viewLocation[1]
+                maxOf(0, actionBarBottom - viewTop)
+            } else {
+                val viewLocation = IntArray(2)
+                view.getLocationOnScreen(viewLocation)
+                val viewTop = viewLocation[1]
+                val estimatedActionBarBottom = statusBarTopInset + actionBarHeight
+                maxOf(0, estimatedActionBarBottom - viewTop)
+            }
+
+            if (view.paddingStart == startInset &&
+                view.paddingTop == topPadding &&
+                view.paddingEnd == endInset &&
+                view.paddingBottom == bottomInset
+            ) return
+
+            view.setPaddingRelative(
+                startInset,
+                topPadding,
+                endInset,
+                bottomInset,
+            )
+        }
+
+        mainLayout.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+            updateContentPadding(view)
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(mainLayout) { view, windowInsets ->
+            val insets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
+            )
+            val isRtl = view.layoutDirection == View.LAYOUT_DIRECTION_RTL
+            startInset = if (isRtl) insets.right else insets.left
+            endInset = if (isRtl) insets.left else insets.right
+            bottomInset = insets.bottom
+            statusBarTopInset = insets.top
+            updateContentPadding(view)
+            windowInsets
+        }
 
         storage = AlarmStorage(this)
         alarms = storage.getAlarms().toMutableList()

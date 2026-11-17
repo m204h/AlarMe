@@ -3,9 +3,9 @@ package com.example.alarmy
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Switch
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.switchmaterial.SwitchMaterial
 import java.util.Locale
 
 class AlarmAdapter(
@@ -18,7 +18,7 @@ class AlarmAdapter(
     class AlarmViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvTime: TextView = view.findViewById(R.id.tvAlarmTime)
         val tvLabel: TextView = view.findViewById(R.id.tvAlarmLabel)
-        val switchEnabled: Switch = view.findViewById(R.id.switchAlarmEnabled)
+        val switchEnabled: SwitchMaterial = view.findViewById(R.id.switchAlarmEnabled)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AlarmViewHolder {

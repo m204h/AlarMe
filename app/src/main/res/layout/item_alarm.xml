@@ -5,6 +5,7 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:padding="16dp"
+    android:layout_marginBottom="8dp"
     android:gravity="center_vertical"
     android:background="?attr/selectableItemBackground">
 
@@ -20,7 +21,8 @@
             android:layout_height="wrap_content"
             android:text="08:00"
             android:textSize="32sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold"
+            android:includeFontPadding="false"/>
 
         <TextView
             android:id="@+id/tvAlarmLabel"
@@ -28,13 +30,16 @@
             android:layout_height="wrap_content"
             android:text="Alarm"
             android:textSize="14sp"
-            android:textColor="@android:color/darker_gray"/>
+            android:includeFontPadding="false"
+            android:textColor="@android:color/darker_gray"
+            android:layout_marginTop="2dp"/>
 
     </LinearLayout>
 
-    <Switch
+    <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/switchAlarmEnabled"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"/>
 
 </LinearLayout>
