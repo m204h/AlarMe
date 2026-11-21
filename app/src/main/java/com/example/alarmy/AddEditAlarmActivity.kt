@@ -6,18 +6,23 @@ import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.util.Log
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.TimePicker
-import android.widget.ToggleButton
-import android.provider.OpenableColumns
 import android.widget.Toast
+import android.widget.ToggleButton
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.net.toUri
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import java.util.Calendar
 
 class AddEditAlarmActivity : AppCompatActivity() {
@@ -46,6 +51,18 @@ class AddEditAlarmActivity : AppCompatActivity() {
     private lateinit var layoutSelectSound: LinearLayout
     private lateinit var tvSelectedSound: TextView
 
+    private val weekdayButtons by lazy {
+        listOf(
+            btnMon to Calendar.MONDAY,
+            btnTue to Calendar.TUESDAY,
+            btnWed to Calendar.WEDNESDAY,
+            btnThu to Calendar.THURSDAY,
+            btnFri to Calendar.FRIDAY,
+            btnSat to Calendar.SATURDAY,
+            btnSun to Calendar.SUNDAY
+        )
+    }
+
     private var alarmId: Int = -1
     private var existingAlarm: Alarm? = null
 
@@ -59,8 +76,10 @@ class AddEditAlarmActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         supportActionBar?.hide()
         setContentView(R.layout.activity_add_edit_alarm)
+        setupWindowInsets()
 
         timePicker = findViewById(R.id.timePicker)
         etAlarmLabel = findViewById(R.id.etAlarmLabel)
@@ -82,7 +101,7 @@ class AddEditAlarmActivity : AppCompatActivity() {
         layoutSelectSound = findViewById(R.id.layoutSelectSound)
         tvSelectedSound = findViewById(R.id.tvSelectedSound)
 
-        alarmId = intent.getIntExtra("EXTRA_ALARM_ID", -1)
+        alarmId = intent.getIntExtra(AlarmService.EXTRA_ALARM_ID, -1)
         val storage = AlarmStorage(this)
 
         if (alarmId != -1) {
@@ -98,13 +117,9 @@ class AddEditAlarmActivity : AppCompatActivity() {
             etAlarmLabel.setText(alarm.label)
 
             val days = alarm.daysOfWeek
-            btnMon.isChecked = days.contains(Calendar.MONDAY)
-            btnTue.isChecked = days.contains(Calendar.TUESDAY)
-            btnWed.isChecked = days.contains(Calendar.WEDNESDAY)
-            btnThu.isChecked = days.contains(Calendar.THURSDAY)
-            btnFri.isChecked = days.contains(Calendar.FRIDAY)
-            btnSat.isChecked = days.contains(Calendar.SATURDAY)
-            btnSun.isChecked = days.contains(Calendar.SUNDAY)
+            weekdayButtons.forEach { (button, day) ->
+                button.isChecked = days.contains(day)
+            }
 
             selectedSoundUri = alarm.soundUri
         } ?: run {
@@ -138,16 +153,9 @@ class AddEditAlarmActivity : AppCompatActivity() {
             val defaultLabel = getString(R.string.alarm_hint)
             val label = etAlarmLabel.text.toString().ifBlank { defaultLabel }
 
-            val daysOfWeek = mutableListOf<Int>()
-            if (btnMon.isChecked) daysOfWeek.add(Calendar.MONDAY)
-            if (btnTue.isChecked) daysOfWeek.add(Calendar.TUESDAY)
-            if (btnWed.isChecked) daysOfWeek.add(Calendar.WEDNESDAY)
-            if (btnThu.isChecked) daysOfWeek.add(Calendar.THURSDAY)
-            if (btnFri.isChecked) daysOfWeek.add(Calendar.FRIDAY)
-            if (btnSat.isChecked) daysOfWeek.add(Calendar.SATURDAY)
-            if (btnSun.isChecked) daysOfWeek.add(Calendar.SUNDAY)
-
-            val alarms = storage.getAlarms().toMutableList()
+            val daysOfWeek = weekdayButtons
+                .filter { it.first.isChecked }
+                .map { it.second }
 
             val alarmToSave = existingAlarm?.copy(
                 hour = hour,
@@ -172,28 +180,46 @@ class AddEditAlarmActivity : AppCompatActivity() {
             val calculatedTriggerTime = AlarmScheduler.calculateNextTriggerTime(alarmToSave, isNewOrUserEdit = true)
             val finalAlarm = alarmToSave.copy(triggerTimeMillis = calculatedTriggerTime)
 
-            val index = alarms.indexOfFirst { it.id == finalAlarm.id }
-            if (index != -1) {
-                alarms[index] = finalAlarm
-            } else {
-                alarms.add(finalAlarm)
-            }
-
-            storage.saveAlarms(alarms)
+            storage.saveOrUpdateAlarm(finalAlarm)
             AlarmScheduler.scheduleAlarm(this, finalAlarm)
 
             finish()
         }
     }
 
+    private fun setupWindowInsets() {
+        val rootView = findViewById<View>(R.id.addEditAlarmRoot)
+        val initialLeft = rootView.paddingLeft
+        val initialTop = rootView.paddingTop
+        val initialRight = rootView.paddingRight
+        val initialBottom = rootView.paddingBottom
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
+            val systemBars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+
+            val topInset = systemBars.top
+            val bottomInset = maxOf(systemBars.bottom, ime.bottom)
+            val leftInset = systemBars.left
+            val rightInset = systemBars.right
+
+            view.setPadding(
+                initialLeft + leftInset,
+                initialTop + topInset,
+                initialRight + rightInset,
+                initialBottom + bottomInset
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(rootView)
+    }
+
     private fun setAllDaysChecked(checked: Boolean) {
-        btnMon.isChecked = checked
-        btnTue.isChecked = checked
-        btnWed.isChecked = checked
-        btnThu.isChecked = checked
-        btnFri.isChecked = checked
-        btnSat.isChecked = checked
-        btnSun.isChecked = checked
+        weekdayButtons.forEach { (button, _) ->
+            button.isChecked = checked
+        }
     }
 
     private fun getAvailableSystemAlarmSounds(): List<SystemSound> {
@@ -212,7 +238,7 @@ class AddEditAlarmActivity : AppCompatActivity() {
                     val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
                     val uri = rm.getRingtoneUri(cursor.position)
                     if (uri != null && uri.toString() != defaultUri?.toString()) {
-                        sounds.add(SystemSound(title ?: "Alarm Sound", uri.toString()))
+                        sounds.add(SystemSound(title ?: getString(R.string.alarm_sound), uri.toString()))
                     }
                 }
             }
@@ -230,7 +256,7 @@ class AddEditAlarmActivity : AppCompatActivity() {
         }
 
         try {
-            val uri = Uri.parse(selectedSoundUri)
+            val uri = selectedSoundUri.toUri()
             val defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
             if (selectedSoundUri == defaultUri?.toString()) {
                 tvSelectedSound.setText(R.string.default_alarm_sound)
@@ -261,7 +287,7 @@ class AddEditAlarmActivity : AppCompatActivity() {
                     previewSound(sounds[which].uri)
                 }
             }
-            .setPositiveButton("OK") { _, _ ->
+            .setPositiveButton(R.string.ok) { _, _ ->
                 stopPreviewSound()
                 selectedSoundUri = sounds[selectedIndex].uri
                 updateSelectedSoundDisplay()
@@ -307,21 +333,26 @@ class AddEditAlarmActivity : AppCompatActivity() {
         stopPreviewSound()
         if (uriStr.isEmpty()) return
 
+        var player: MediaPlayer? = null
         try {
-            val uri = Uri.parse(uriStr)
+            val uri = uriStr.toUri()
             val audioAttributes = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ALARM)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
 
-            previewMediaPlayer = MediaPlayer().apply {
-                setAudioAttributes(audioAttributes)
-                setDataSource(applicationContext, uri)
-                prepare()
-                start()
-            }
+            player = MediaPlayer()
+            player.setAudioAttributes(audioAttributes)
+            player.setDataSource(applicationContext, uri)
+            player.prepare()
+            player.start()
+            previewMediaPlayer = player
         } catch (e: Exception) {
             Log.e(TAG, "Error previewing sound: $uriStr", e)
+            try {
+                player?.release()
+            } catch (_: Exception) {}
+            previewMediaPlayer = null
         }
     }
 

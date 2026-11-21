@@ -2,10 +2,10 @@ package com.example.alarmy
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.edit
-import org.json.JSONArray
-import org.json.JSONObject
 
 /**
  * Direct Boot compatible storage mechanism using Device Protected Storage.
@@ -13,7 +13,7 @@ import org.json.JSONObject
  * This storage operates on Context.createDeviceProtectedStorageContext(), allowing
  * alarms to be recovered and scheduled before the user unlocks their device.
  */
-class AlarmBootStorage(context: Context) {
+class AlarmBootStorage(private val context: Context) {
 
     private val dpContext: Context = if (context.isDeviceProtectedStorage) {
         context
@@ -29,91 +29,66 @@ class AlarmBootStorage(context: Context) {
         private const val TAG = "AlarmBootStorage"
         private const val PREFS_NAME = "alarm_boot_prefs"
         private const val KEY_BOOT_ALARMS = "boot_alarms_list"
-        private const val KEY_LAST_RECOVERY_BOOT_UPTIME = "last_recovery_boot_uptime"
+        private const val KEY_LAST_RECOVERY_BOOT_ID = "last_recovery_boot_id"
         private const val KEY_PENDING_UNLOCK_SYNC = "pending_unlock_sync"
+
+        fun getBootSessionId(context: Context): String {
+            return try {
+                val bootCount = Settings.Global.getInt(
+                    context.contentResolver,
+                    Settings.Global.BOOT_COUNT,
+                    -1
+                )
+                if (bootCount != -1) {
+                    "boot_count_$bootCount"
+                } else {
+                    val bootTimeSec = (System.currentTimeMillis() - SystemClock.elapsedRealtime()) / 10000L
+                    "boot_time_$bootTimeSec"
+                }
+            } catch (_: Exception) {
+                val bootTimeSec = (System.currentTimeMillis() - SystemClock.elapsedRealtime()) / 10000L
+                "boot_time_$bootTimeSec"
+            }
+        }
     }
 
-    fun getBootAlarms(): List<Alarm> {
+    fun getBootAlarmsResult(): Result<List<Alarm>> {
         val jsonStr = try {
             prefs.getString(KEY_BOOT_ALARMS, "[]") ?: "[]"
         } catch (e: Exception) {
             Log.e(TAG, "Error accessing Device Protected SharedPreferences", e)
-            return emptyList()
+            return Result.failure(e)
         }
-
-        val alarms = mutableListOf<Alarm>()
-        try {
-            val jsonArray = JSONArray(jsonStr)
-            for (i in 0 until jsonArray.length()) {
-                val obj = jsonArray.getJSONObject(i)
-                val idLong = obj.optLong("id", System.currentTimeMillis())
-                val idInt = (idLong % 1_000_000_000).toInt().let { if (it < 0) -it else it }
-
-                val daysArray = obj.optJSONArray("daysOfWeek")
-                val daysList = mutableListOf<Int>()
-                if (daysArray != null) {
-                    for (j in 0 until daysArray.length()) {
-                        daysList.add(daysArray.getInt(j))
-                    }
-                }
-
-                alarms.add(
-                    Alarm(
-                        id = idInt,
-                        hour = obj.getInt("hour"),
-                        minute = obj.getInt("minute"),
-                        isEnabled = obj.getBoolean("isEnabled"),
-                        label = obj.optString("label", "Alarm"),
-                        daysOfWeek = daysList,
-                        soundUri = obj.optString("soundUri", ""),
-                        triggerTimeMillis = obj.optLong("triggerTimeMillis", 0L),
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing boot alarms from JSON", e)
-        }
-        return alarms
+        return Alarm.listFromJsonStringResult(jsonStr)
     }
 
-    fun saveBootAlarms(alarms: List<Alarm>) {
-        try {
-            val jsonArray = JSONArray()
-            for (alarm in alarms) {
-                val obj = JSONObject().apply {
-                    put("id", alarm.id)
-                    put("hour", alarm.hour)
-                    put("minute", alarm.minute)
-                    put("isEnabled", alarm.isEnabled)
-                    put("label", alarm.label)
-                    put("daysOfWeek", JSONArray(alarm.daysOfWeek))
-                    put("soundUri", alarm.soundUri)
-                    put("triggerTimeMillis", alarm.triggerTimeMillis)
-                }
-                jsonArray.put(obj)
-            }
-            prefs.edit { putString(KEY_BOOT_ALARMS, jsonArray.toString()) }
+    fun getBootAlarms(): List<Alarm> {
+        return getBootAlarmsResult().getOrDefault(emptyList())
+    }
+
+    fun saveBootAlarms(alarms: List<Alarm>): Boolean {
+        return try {
+            prefs.edit { putString(KEY_BOOT_ALARMS, Alarm.listToJsonString(alarms)) }
             Log.d(TAG, "Saved ${alarms.size} alarms to Device Protected Storage")
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Error saving boot alarms to Device Protected Storage", e)
+            false
         }
     }
 
-    fun recordBootRecovery(uptimeMillis: Long) {
+    fun recordBootRecovery(bootSessionId: String = getBootSessionId(context)) {
         try {
-            prefs.edit { putLong(KEY_LAST_RECOVERY_BOOT_UPTIME, uptimeMillis) }
+            prefs.edit { putString(KEY_LAST_RECOVERY_BOOT_ID, bootSessionId) }
         } catch (e: Exception) {
-            Log.e(TAG, "Error recording boot recovery uptime", e)
+            Log.e(TAG, "Error recording boot recovery session ID", e)
         }
     }
 
-    fun hasRecoveredForCurrentBoot(currentUptimeMillis: Long): Boolean {
+    fun hasRecoveredForCurrentBoot(currentBootSessionId: String = getBootSessionId(context)): Boolean {
         return try {
-            val lastRecordedUptime = prefs.getLong(KEY_LAST_RECOVERY_BOOT_UPTIME, -1L)
-            // SystemClock.elapsedRealtime() resets on boot.
-            // If last recorded uptime was within the current boot cycle (i.e. > 0 and <= currentUptimeMillis),
-            // then recovery already occurred during this boot cycle.
-            lastRecordedUptime in 1L..currentUptimeMillis
+            val lastRecordedBootId = prefs.getString(KEY_LAST_RECOVERY_BOOT_ID, null)
+            lastRecordedBootId != null && lastRecordedBootId == currentBootSessionId
         } catch (_: Exception) {
             false
         }

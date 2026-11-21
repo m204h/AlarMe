@@ -4,33 +4,57 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/mainLayout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="?attr/colorSurface">
+    android:layout_height="match_parent">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:clipToPadding="false">
+        android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tvAlarmHeading"
+        <LinearLayout
+            android:id="@+id/appBarContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/no_alarm"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false"
-            android:paddingBottom="16dp"/>
+            android:orientation="vertical"
+            android:background="?attr/colorPrimary">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerViewAlarms"
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                app:title="@string/app_name"
+                app:titleTextColor="@android:color/white"
+                app:popupTheme="@style/ThemeOverlay.Alarmy.Popup" />
+
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingBottom="88dp"/>
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:clipToPadding="false">
+
+            <TextView
+                android:id="@+id/tvAlarmHeading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/no_alarm"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false"
+                android:paddingBottom="16dp"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerViewAlarms"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingBottom="88dp"/>
+
+        </LinearLayout>
 
     </LinearLayout>
 
@@ -40,7 +64,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
-        android:contentDescription="Add Alarm"
+        android:contentDescription="@string/add_alarm"
         app:fabSize="normal"
         app:backgroundTint="?attr/colorSecondary"
         app:tint="?attr/colorOnSecondary"

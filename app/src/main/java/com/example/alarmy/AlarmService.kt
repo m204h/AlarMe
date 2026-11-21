@@ -17,6 +17,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.net.toUri
 
 class AlarmService : Service() {
 
@@ -30,6 +31,7 @@ class AlarmService : Service() {
         const val ACTION_START_ALARM = "com.example.alarmy.ACTION_START_ALARM"
         const val ACTION_STOP_ALARM = "com.example.alarmy.ACTION_STOP_ALARM"
         const val ACTION_SNOOZE_ALARM = "com.example.alarmy.ACTION_SNOOZE_ALARM"
+        const val ACTION_DISMISS_ALARM = "com.example.alarmy.ACTION_DISMISS_ALARM"
 
         const val EXTRA_ALARM_ID = "EXTRA_ALARM_ID"
         const val EXTRA_ALARM_LABEL = "EXTRA_ALARM_LABEL"
@@ -43,7 +45,7 @@ class AlarmService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action ?: ACTION_START_ALARM
         val alarmId = intent?.getIntExtra(EXTRA_ALARM_ID, -1) ?: -1
-        val label = intent?.getStringExtra(EXTRA_ALARM_LABEL) ?: "Alarm"
+        val label = intent?.getStringExtra(EXTRA_ALARM_LABEL) ?: Alarm.DEFAULT_LABEL
 
         Log.d(TAG, "onStartCommand action=$action, alarmId=$alarmId, label='$label'")
 
@@ -76,19 +78,18 @@ class AlarmService : Service() {
         if (alarmId != -1) {
             try {
                 val storage = AlarmStorage(this)
-                val alarms = storage.getAlarms().toMutableList()
-                val index = alarms.indexOfFirst { it.id == alarmId }
-                if (index != -1) {
-                    val alarm = alarms[index]
+                val alarm = storage.getAlarms().find { it.id == alarmId }
+                if (alarm != null) {
                     customSoundUri = alarm.soundUri
                     if (alarm.daysOfWeek.isNotEmpty()) {
-                        // Calculate next occurrence for repeating alarm
-                        AlarmScheduler.scheduleAlarm(this, alarm)
+                        // Calculate next occurrence for repeating alarm and clear snooze
+                        val updated = alarm.copy(snoozeTriggerTimeMillis = 0L)
+                        storage.updateAlarm(alarmId) { updated }
+                        AlarmScheduler.scheduleAlarm(this, updated)
                     } else {
-                        // One-time alarm: mark disabled in storage
-                        val updated = alarm.copy(isEnabled = false, triggerTimeMillis = 0L)
-                        alarms[index] = updated
-                        storage.saveAlarms(alarms)
+                        // One-time alarm: mark disabled in storage and clear snooze
+                        val updated = alarm.copy(isEnabled = false, triggerTimeMillis = 0L, snoozeTriggerTimeMillis = 0L)
+                        storage.updateAlarm(alarmId) { updated }
                         AlarmScheduler.cancelAlarm(this, updated)
                     }
                 }
@@ -135,14 +136,14 @@ class AlarmService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Alarm Ringing")
+            .setContentTitle(getString(R.string.alarm_ringing))
             .setContentText(label)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setFullScreenIntent(fullScreenPendingIntent, true)
             .setContentIntent(fullScreenPendingIntent)
-            .addAction(0, "Stop", stopPendingIntent)
-            .addAction(0, "Snooze", snoozePendingIntent)
+            .addAction(0, getString(R.string.stop), stopPendingIntent)
+            .addAction(0, getString(R.string.snooze), snoozePendingIntent)
             .setAutoCancel(false)
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -200,66 +201,35 @@ class AlarmService : Service() {
 
     private fun startAudioAndVibration(soundUriStr: String) {
         if (mediaPlayer == null) {
-            var playerStarted = false
+            val candidateUris = mutableListOf<Uri>()
 
-            // 1. Attempt to play custom sound URI if provided
+            // 1. Candidate: custom sound URI if provided
             if (soundUriStr.isNotEmpty()) {
                 try {
-                    val customUri = Uri.parse(soundUriStr)
-                    mediaPlayer = createAndStartMediaPlayer(customUri)
-                    playerStarted = true
-                    Log.d(TAG, "Started MediaPlayer with custom sound Uri: $customUri")
+                    candidateUris.add(soundUriStr.toUri())
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to play custom sound Uri (may be inaccessible before unlock). Falling back to default alarm.", e)
+                    Log.w(TAG, "Invalid custom sound URI: $soundUriStr", e)
+                }
+            }
+
+            // 2. Candidates in priority order: default alarm, notification, ringtone
+            listOf(
+                RingtoneManager.TYPE_ALARM,
+                RingtoneManager.TYPE_NOTIFICATION,
+                RingtoneManager.TYPE_RINGTONE
+            ).forEach { type ->
+                RingtoneManager.getDefaultUri(type)?.let { candidateUris.add(it) }
+            }
+
+            for (uri in candidateUris) {
+                try {
+                    mediaPlayer = createAndStartMediaPlayer(uri)
+                    Log.d(TAG, "Started MediaPlayer with sound: $uri")
+                    break
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to play sound: $uri. Trying fallback.", e)
                     mediaPlayer?.release()
                     mediaPlayer = null
-                }
-            }
-
-            // 2. Fall back to system default alarm sound
-            if (!playerStarted) {
-                val defaultAlarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                if (defaultAlarmUri != null) {
-                    try {
-                        mediaPlayer = createAndStartMediaPlayer(defaultAlarmUri)
-                        playerStarted = true
-                        Log.d(TAG, "Started MediaPlayer with default alarm sound: $defaultAlarmUri")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed to play default alarm sound. Trying notification sound fallback.", e)
-                        mediaPlayer?.release()
-                        mediaPlayer = null
-                    }
-                }
-            }
-
-            // 3. Fall back to system default notification sound
-            if (!playerStarted) {
-                val defaultNotifUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                if (defaultNotifUri != null) {
-                    try {
-                        mediaPlayer = createAndStartMediaPlayer(defaultNotifUri)
-                        playerStarted = true
-                        Log.d(TAG, "Started MediaPlayer with default notification sound: $defaultNotifUri")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed to play default notification sound. Trying ringtone sound fallback.", e)
-                        mediaPlayer?.release()
-                        mediaPlayer = null
-                    }
-                }
-            }
-
-            // 4. Fall back to system default ringtone
-            if (!playerStarted) {
-                val defaultRingtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                if (defaultRingtoneUri != null) {
-                    try {
-                        mediaPlayer = createAndStartMediaPlayer(defaultRingtoneUri)
-                        Log.d(TAG, "Started MediaPlayer with default ringtone sound: $defaultRingtoneUri")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to play default ringtone sound.", e)
-                        mediaPlayer?.release()
-                        mediaPlayer = null
-                    }
                 }
             }
         }
@@ -284,12 +254,19 @@ class AlarmService : Service() {
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
 
-        return MediaPlayer().apply {
-            setAudioAttributes(audioAttributes)
-            setDataSource(applicationContext, uri)
-            isLooping = true
-            prepare()
-            start()
+        val player = MediaPlayer()
+        try {
+            player.setAudioAttributes(audioAttributes)
+            player.setDataSource(applicationContext, uri)
+            player.isLooping = true
+            player.prepare()
+            player.start()
+            return player
+        } catch (e: Exception) {
+            try {
+                player.release()
+            } catch (_: Exception) {}
+            throw e
         }
     }
 
@@ -317,7 +294,9 @@ class AlarmService : Service() {
 
         releaseWakeLock()
 
-        val dismissIntent = Intent("com.example.alarmy.ACTION_DISMISS_ALARM")
+        val dismissIntent = Intent(ACTION_DISMISS_ALARM).apply {
+            `package` = packageName
+        }
         sendBroadcast(dismissIntent)
 
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -327,15 +306,15 @@ class AlarmService : Service() {
     private fun createNotificationChannel() {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Alarm Service",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Active Alarm Service Notification"
-                enableVibration(true)
-                setBypassDnd(true)
-                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
-            }
+            CHANNEL_ID,
+            getString(R.string.notification_channel_name),
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = getString(R.string.notification_channel_desc)
+            enableVibration(true)
+            setBypassDnd(true)
+            lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+        }
         notificationManager.createNotificationChannel(channel)
     }
 

@@ -18,9 +18,14 @@ object AlarmScheduler {
      *
      * @param alarm The alarm to evaluate.
      * @param isNewOrUserEdit True if the user is explicitly saving or editing the alarm in the UI.
+     * @param isTimeOrTimezoneChange True if handling a system clock or timezone change broadcast.
      * @return The next trigger timestamp in milliseconds, or -1L if an unrepeated alarm has already passed.
      */
-    fun calculateNextTriggerTime(alarm: Alarm, isNewOrUserEdit: Boolean = false): Long {
+    fun calculateNextTriggerTime(
+        alarm: Alarm,
+        isNewOrUserEdit: Boolean = false,
+        isTimeOrTimezoneChange: Boolean = false
+    ): Long {
         val nowMillis = System.currentTimeMillis()
 
         if (alarm.daysOfWeek.isNotEmpty()) {
@@ -54,20 +59,21 @@ object AlarmScheduler {
         } else {
             // One-time alarm
             val todayCal = Calendar.getInstance().apply {
+                timeInMillis = nowMillis
                 set(Calendar.HOUR_OF_DAY, alarm.hour)
                 set(Calendar.MINUTE, alarm.minute)
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
             }
 
-            return if (isNewOrUserEdit) {
-                // If user configured a time that has already passed today, schedule for tomorrow
+            return if (isNewOrUserEdit || isTimeOrTimezoneChange) {
+                // If user configured or clock/timezone changed, schedule for next valid occurrence (today or tomorrow)
                 if (todayCal.timeInMillis <= nowMillis) {
                     todayCal.add(Calendar.DAY_OF_YEAR, 1)
                 }
                 todayCal.timeInMillis
             } else {
-                // Boot recovery, timezone change, or process recovery:
+                // Boot recovery or process recovery:
                 if (alarm.triggerTimeMillis > 0L) {
                     if (alarm.triggerTimeMillis > nowMillis) {
                         alarm.triggerTimeMillis
@@ -87,25 +93,67 @@ object AlarmScheduler {
         }
     }
 
-    fun scheduleAlarm(context: Context, alarm: Alarm) {
+    private fun createAlarmPendingIntent(context: Context, alarmId: Int, label: String = ""): PendingIntent {
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = "com.example.alarmy.ALARM_TRIGGER_$alarmId"
+            putExtra(AlarmService.EXTRA_ALARM_ID, alarmId)
+            if (label.isNotEmpty()) {
+                putExtra(AlarmService.EXTRA_ALARM_LABEL, label)
+            }
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            alarmId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun createShowPendingIntent(context: Context, alarmId: Int): PendingIntent {
+        val showIntent = Intent(context, MainActivity::class.java)
+        return PendingIntent.getActivity(
+            context,
+            alarmId,
+            showIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    fun scheduleAlarm(context: Context, alarm: Alarm, isTimeOrTimezoneChange: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (alarm.snoozeTriggerTimeMillis > now) {
+            // Pending snooze active
+            scheduleSnoozeIntent(context, alarm.id, alarm.label, alarm.snoozeTriggerTimeMillis)
+            return
+        } else if (alarm.snoozeTriggerTimeMillis > 0L) {
+            // Expired snooze: clear it
+            try {
+                AlarmStorage(context).updateAlarm(alarm.id) {
+                    it.copy(snoozeTriggerTimeMillis = 0L)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error clearing expired snooze", e)
+            }
+        }
+
         if (!alarm.isEnabled) {
             Log.d(TAG, "Alarm ${alarm.id} is disabled. Cancelling any scheduled intent.")
             cancelAlarm(context, alarm)
             return
         }
 
-        val triggerTime = calculateNextTriggerTime(alarm, isNewOrUserEdit = false)
+        val triggerTime = calculateNextTriggerTime(
+            alarm,
+            isNewOrUserEdit = false,
+            isTimeOrTimezoneChange = isTimeOrTimezoneChange
+        )
 
         if (triggerTime <= 0L) {
             Log.w(TAG, "One-time alarm ID=${alarm.id} scheduled time has already passed. Marking disabled.")
             cancelAlarm(context, alarm)
             try {
-                val storage = AlarmStorage(context)
-                val alarms = storage.getAlarms().toMutableList()
-                val index = alarms.indexOfFirst { it.id == alarm.id }
-                if (index != -1) {
-                    alarms[index] = alarms[index].copy(isEnabled = false, triggerTimeMillis = 0L)
-                    storage.saveAlarms(alarms)
+                AlarmStorage(context).updateAlarm(alarm.id) {
+                    it.copy(isEnabled = false, triggerTimeMillis = 0L)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating expired alarm in storage", e)
@@ -116,12 +164,8 @@ object AlarmScheduler {
         // Persist triggerTimeMillis if it changed
         if (alarm.triggerTimeMillis != triggerTime) {
             try {
-                val storage = AlarmStorage(context)
-                val alarms = storage.getAlarms().toMutableList()
-                val index = alarms.indexOfFirst { it.id == alarm.id }
-                if (index != -1) {
-                    alarms[index] = alarms[index].copy(triggerTimeMillis = triggerTime)
-                    storage.saveAlarms(alarms)
+                AlarmStorage(context).updateAlarm(alarm.id) {
+                    it.copy(triggerTimeMillis = triggerTime)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error persisting triggerTimeMillis", e)
@@ -129,29 +173,11 @@ object AlarmScheduler {
         }
 
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
-            action = "com.example.alarmy.ALARM_TRIGGER_${alarm.id}"
-            putExtra("EXTRA_ALARM_ID", alarm.id)
-            putExtra("EXTRA_ALARM_LABEL", alarm.label)
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            alarm.id,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val pendingIntent = createAlarmPendingIntent(context, alarm.id, alarm.label)
+        val showPendingIntent = createShowPendingIntent(context, alarm.id)
 
         val timeFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         Log.d(TAG, "Scheduling alarm ID=${alarm.id} ('${alarm.label}') for ${timeFormatter.format(triggerTime)}")
-
-        val showIntent = Intent(context, MainActivity::class.java)
-        val showPendingIntent = PendingIntent.getActivity(
-            context,
-            alarm.id,
-            showIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
 
         try {
             if (alarmManager.canScheduleExactAlarms()) {
@@ -172,45 +198,31 @@ object AlarmScheduler {
 
     fun cancelAlarm(context: Context, alarm: Alarm) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
-            action = "com.example.alarmy.ALARM_TRIGGER_${alarm.id}"
-        }
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            alarm.id,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val pendingIntent = createAlarmPendingIntent(context, alarm.id)
         alarmManager.cancel(pendingIntent)
         Log.d(TAG, "Cancelled alarm ID=${alarm.id} in AlarmManager.")
     }
 
     fun snoozeAlarm(context: Context, alarmId: Int, label: String, snoozeMinutes: Int = 5) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
-            action = "com.example.alarmy.ALARM_TRIGGER_$alarmId"
-            putExtra("EXTRA_ALARM_ID", alarmId)
-            putExtra("EXTRA_ALARM_LABEL", label)
-        }
-
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            alarmId,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         val triggerTime = System.currentTimeMillis() + (snoozeMinutes * 60 * 1000L)
         val timeFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         Log.d(TAG, "Snoozing alarm ID=$alarmId for $snoozeMinutes minutes (Trigger at ${timeFormatter.format(triggerTime)})")
 
-        val showIntent = Intent(context, MainActivity::class.java)
-        val showPendingIntent = PendingIntent.getActivity(
-            context,
-            alarmId,
-            showIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        try {
+            AlarmStorage(context).updateAlarm(alarmId) {
+                it.copy(snoozeTriggerTimeMillis = triggerTime)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving snooze time in storage", e)
+        }
+
+        scheduleSnoozeIntent(context, alarmId, label, triggerTime)
+    }
+
+    private fun scheduleSnoozeIntent(context: Context, alarmId: Int, label: String, triggerTime: Long) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pendingIntent = createAlarmPendingIntent(context, alarmId, label)
+        val showPendingIntent = createShowPendingIntent(context, alarmId)
 
         try {
             if (alarmManager.canScheduleExactAlarms()) {
@@ -222,5 +234,22 @@ object AlarmScheduler {
             Log.e(TAG, "SecurityException while snoozing alarm ID=$alarmId", e)
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
         }
+    }
+
+    fun rescheduleAll(context: Context, alarms: List<Alarm>, isTimeOrTimezoneChange: Boolean = false) {
+        val now = System.currentTimeMillis()
+        for (alarm in alarms) {
+            if (alarm.isEnabled || alarm.snoozeTriggerTimeMillis > now) {
+                scheduleAlarm(context, alarm, isTimeOrTimezoneChange = isTimeOrTimezoneChange)
+            }
+        }
+    }
+
+    fun rescheduleAllEnabled(context: Context, alarms: List<Alarm>) {
+        rescheduleAll(context, alarms, isTimeOrTimezoneChange = false)
+    }
+
+    fun recalculateAndRescheduleAll(context: Context, alarms: List<Alarm>) {
+        rescheduleAll(context, alarms, isTimeOrTimezoneChange = true)
     }
 }

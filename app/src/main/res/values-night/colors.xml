@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Theme Palette & Dynamic Tokens (Dark) -->
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#8FA3B5</color>
+    <color name="card_background">#123249</color>
+    <color name="card_stroke">#1E3A52</color>
+    <color name="selector_container_bg">#061222</color>
+    <color name="selector_container_stroke">#1E3A52</color>
+    <color name="theme_option_unselected_text">#8FA3B5</color>
+    <color name="weekday_text_unchecked">#FFFFFFFF</color>
+</resources>

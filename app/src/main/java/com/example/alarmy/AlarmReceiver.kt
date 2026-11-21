@@ -13,8 +13,8 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        val alarmId = intent.getIntExtra("EXTRA_ALARM_ID", -1)
-        val label = intent.getStringExtra("EXTRA_ALARM_LABEL") ?: "Alarm"
+        val alarmId = intent.getIntExtra(AlarmService.EXTRA_ALARM_ID, -1)
+        val label = intent.getStringExtra(AlarmService.EXTRA_ALARM_LABEL) ?: Alarm.DEFAULT_LABEL
 
         Log.d(TAG, "onReceive triggered for alarmId=$alarmId, label='$label', action='${intent.action}'")
 

@@ -11,12 +11,13 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.os.UserManagerCompat
 
 class AlarmRingingActivity : AppCompatActivity() {
 
     private var alarmId: Int = -1
-    private var alarmLabel: String = "Alarm"
+    private var alarmLabel: String = Alarm.DEFAULT_LABEL
 
     companion object {
         private const val TAG = "AlarmRingingActivity"
@@ -24,7 +25,7 @@ class AlarmRingingActivity : AppCompatActivity() {
 
     private val dismissReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == "com.example.alarmy.ACTION_DISMISS_ALARM") {
+            if (intent?.action == AlarmService.ACTION_DISMISS_ALARM) {
                 Log.d(TAG, "Received ACTION_DISMISS_ALARM, finishing activity")
                 finish()
             }
@@ -53,8 +54,8 @@ class AlarmRingingActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_alarm_ringing)
 
-        alarmId = intent.getIntExtra("EXTRA_ALARM_ID", -1)
-        alarmLabel = intent.getStringExtra("EXTRA_ALARM_LABEL") ?: "Alarm"
+        alarmId = intent.getIntExtra(AlarmService.EXTRA_ALARM_ID, -1)
+        alarmLabel = intent.getStringExtra(AlarmService.EXTRA_ALARM_LABEL) ?: getString(R.string.alarm_hint)
 
         Log.d(TAG, "onCreate alarmId=$alarmId, label='$alarmLabel'")
 
@@ -85,11 +86,11 @@ class AlarmRingingActivity : AppCompatActivity() {
             finish()
         }
 
-        androidx.core.content.ContextCompat.registerReceiver(
+        ContextCompat.registerReceiver(
             this,
             dismissReceiver,
-            IntentFilter("com.example.alarmy.ACTION_DISMISS_ALARM"),
-            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+            IntentFilter(AlarmService.ACTION_DISMISS_ALARM),
+            ContextCompat.RECEIVER_NOT_EXPORTED
         )
     }
 
@@ -98,7 +99,7 @@ class AlarmRingingActivity : AppCompatActivity() {
         try {
             unregisterReceiver(dismissReceiver)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error unregistering dismissReceiver", e)
         }
     }
 }

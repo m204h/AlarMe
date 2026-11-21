@@ -1,12 +1,15 @@
 package com.example.alarmy
 
+import android.text.format.DateFormat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageButton
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.switchmaterial.SwitchMaterial
-import java.util.Locale
+import java.util.Calendar
 
 class AlarmAdapter(
     private var alarms: List<Alarm>,
@@ -18,6 +21,7 @@ class AlarmAdapter(
     class AlarmViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvTime: TextView = view.findViewById(R.id.tvAlarmTime)
         val tvLabel: TextView = view.findViewById(R.id.tvAlarmLabel)
+        val btnDelete: ImageButton = view.findViewById(R.id.btnDeleteAlarm)
         val switchEnabled: SwitchMaterial = view.findViewById(R.id.switchAlarmEnabled)
     }
 
@@ -28,14 +32,24 @@ class AlarmAdapter(
 
     override fun onBindViewHolder(holder: AlarmViewHolder, position: Int) {
         val alarm = alarms[position]
-        val timeStr = String.format(Locale.getDefault(), "%02d:%02d", alarm.hour, alarm.minute)
-        holder.tvTime.text = timeStr
+        val context = holder.itemView.context
+
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, alarm.hour)
+            set(Calendar.MINUTE, alarm.minute)
+        }
+        val timeFormat = DateFormat.getTimeFormat(context)
+        holder.tvTime.text = timeFormat.format(calendar.time)
         holder.tvLabel.text = alarm.label
         holder.switchEnabled.isChecked = alarm.isEnabled
 
         holder.switchEnabled.setOnCheckedChangeListener(null)
         holder.switchEnabled.setOnCheckedChangeListener { _, isChecked ->
             onToggle(alarm, isChecked)
+        }
+
+        holder.btnDelete.setOnClickListener {
+            onDelete(alarm)
         }
 
         holder.itemView.setOnClickListener {
@@ -51,7 +65,20 @@ class AlarmAdapter(
     override fun getItemCount() = alarms.size
 
     fun updateAlarms(newAlarms: List<Alarm>) {
+        val diffCallback = object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = alarms.size
+            override fun getNewListSize(): Int = newAlarms.size
+
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                return alarms[oldItemPosition].id == newAlarms[newItemPosition].id
+            }
+
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                return alarms[oldItemPosition] == newAlarms[newItemPosition]
+            }
+        }
+        val diffResult = DiffUtil.calculateDiff(diffCallback)
         alarms = newAlarms
-        notifyDataSetChanged()
+        diffResult.dispatchUpdatesTo(this)
     }
 }

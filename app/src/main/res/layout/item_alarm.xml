@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
@@ -17,24 +19,40 @@
 
         <TextView
             android:id="@+id/tvAlarmTime"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="08:00"
+            tools:text="08:00"
             android:textSize="32sp"
             android:textStyle="bold"
-            android:includeFontPadding="false"/>
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:ellipsize="end"/>
 
         <TextView
             android:id="@+id/tvAlarmLabel"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Alarm"
+            tools:text="Alarm"
             android:textSize="14sp"
             android:includeFontPadding="false"
-            android:textColor="@android:color/darker_gray"
+            android:textColor="?android:attr/textColorSecondary"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:layout_marginTop="2dp"/>
 
     </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/btnDeleteAlarm"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/delete"
+        android:src="@android:drawable/ic_menu_delete"
+        android:padding="12dp"
+        android:layout_gravity="center_vertical"
+        android:layout_marginEnd="8dp"
+        app:tint="?android:attr/textColorSecondary" />
 
     <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/switchAlarmEnabled"

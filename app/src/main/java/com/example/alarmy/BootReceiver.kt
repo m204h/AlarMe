@@ -3,7 +3,6 @@ package com.example.alarmy
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.SystemClock
 import android.util.Log
 import androidx.core.os.UserManagerCompat
 
@@ -16,9 +15,9 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         val isUnlocked = UserManagerCompat.isUserUnlocked(context)
-        val currentUptime = SystemClock.elapsedRealtime()
+        val bootSessionId = AlarmBootStorage.getBootSessionId(context)
 
-        Log.d(TAG, "onReceive action=$action, userUnlocked=$isUnlocked, currentUptime=$currentUptime")
+        Log.d(TAG, "onReceive action=$action, userUnlocked=$isUnlocked, bootSessionId=$bootSessionId")
 
         val bootStorage = AlarmBootStorage(context)
         val storage = AlarmStorage(context)
@@ -31,12 +30,8 @@ class BootReceiver : BroadcastReceiver() {
                     val bootAlarms = bootStorage.getBootAlarms()
                     Log.d(TAG, "Restoring ${bootAlarms.size} alarms from Device Protected Storage")
 
-                    for (alarm in bootAlarms) {
-                        if (alarm.isEnabled) {
-                            AlarmScheduler.scheduleAlarm(context, alarm)
-                        }
-                    }
-                    bootStorage.recordBootRecovery(currentUptime)
+                    AlarmScheduler.rescheduleAll(context, bootAlarms)
+                    bootStorage.recordBootRecovery(bootSessionId)
                 }
 
                 Intent.ACTION_USER_UNLOCKED -> {
@@ -56,32 +51,29 @@ class BootReceiver : BroadcastReceiver() {
                     }
 
                     // Check if alarms were already recovered for this boot session in LOCKED_BOOT_COMPLETED
-                    val alreadyRecovered = bootStorage.hasRecoveredForCurrentBoot(currentUptime)
+                    val alreadyRecovered = bootStorage.hasRecoveredForCurrentBoot(bootSessionId)
 
                     if (alreadyRecovered) {
                         Log.d(TAG, "Alarms were already scheduled in LOCKED_BOOT_COMPLETED. Skipping duplicate scheduling.")
                     } else {
                         Log.d(TAG, "Performing alarm recovery (Locked boot did not run or first boot recovery)")
                         val alarms = storage.getAlarms()
-                        for (alarm in alarms) {
-                            if (alarm.isEnabled) {
-                                AlarmScheduler.scheduleAlarm(context, alarm)
-                            }
-                        }
-                        bootStorage.recordBootRecovery(currentUptime)
+                        AlarmScheduler.rescheduleAll(context, alarms)
+                        bootStorage.recordBootRecovery(bootSessionId)
                     }
                 }
 
-                Intent.ACTION_MY_PACKAGE_REPLACED,
                 Intent.ACTION_TIME_CHANGED,
                 Intent.ACTION_TIMEZONE_CHANGED -> {
+                    Log.d(TAG, "Handling $action: recalculating scheduled alarms")
+                    val alarms = storage.getAlarms()
+                    AlarmScheduler.recalculateAndRescheduleAll(context, alarms)
+                }
+
+                Intent.ACTION_MY_PACKAGE_REPLACED -> {
                     Log.d(TAG, "Handling $action: re-evaluating scheduled alarms")
                     val alarms = storage.getAlarms()
-                    for (alarm in alarms) {
-                        if (alarm.isEnabled) {
-                            AlarmScheduler.scheduleAlarm(context, alarm)
-                        }
-                    }
+                    AlarmScheduler.rescheduleAll(context, alarms)
                 }
 
                 else -> {

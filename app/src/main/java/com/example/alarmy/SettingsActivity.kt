@@ -2,13 +2,15 @@ package com.example.alarmy
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.card.MaterialCardView
@@ -28,77 +30,74 @@ class SettingsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
 
+        val settingsLayout = findViewById<View>(R.id.settingsLayout)
+        val appBarContainer = findViewById<View>(R.id.appBarContainer)
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)
             setTitle(R.string.menu_settings)
         }
 
-        val settingsLayout = findViewById<View>(R.id.settingsLayout)
-        val actionBarContainer = window.decorView.findViewById<View>(androidx.appcompat.R.id.action_bar_container)
-
-        val actionBarHeight = android.util.TypedValue().let { value ->
-            if (theme.resolveAttribute(androidx.appcompat.R.attr.actionBarSize, value, true)) {
-                android.util.TypedValue.complexToDimensionPixelSize(value.data, resources.displayMetrics)
-            } else {
-                0
-            }
-        }
-
-        var startInset = 0
-        var endInset = 0
-        var bottomInset = 0
-        var statusBarTopInset = 0
-
-        fun updateContentPadding(view: View) {
-            val topPadding = if (actionBarContainer != null && actionBarContainer.height > 0) {
-                val actionBarLocation = IntArray(2)
-                val viewLocation = IntArray(2)
-                actionBarContainer.getLocationOnScreen(actionBarLocation)
-                view.getLocationOnScreen(viewLocation)
-                val actionBarBottom = actionBarLocation[1] + actionBarContainer.height
-                val viewTop = viewLocation[1]
-                maxOf(0, actionBarBottom - viewTop)
-            } else {
-                val viewLocation = IntArray(2)
-                view.getLocationOnScreen(viewLocation)
-                val viewTop = viewLocation[1]
-                val estimatedActionBarBottom = statusBarTopInset + actionBarHeight
-                maxOf(0, estimatedActionBarBottom - viewTop)
-            }
-
-            if (view.paddingStart == startInset &&
-                view.paddingTop == topPadding &&
-                view.paddingEnd == endInset &&
-                view.paddingBottom == bottomInset
-            ) return
-
-            view.setPaddingRelative(
-                startInset,
-                topPadding,
-                endInset,
-                bottomInset,
-            )
-        }
-
-        settingsLayout.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-            updateContentPadding(view)
-        }
-        ViewCompat.setOnApplyWindowInsetsListener(settingsLayout) { view, windowInsets ->
+        ViewCompat.setOnApplyWindowInsetsListener(settingsLayout) { _, windowInsets ->
             val insets = windowInsets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
             )
-            val isRtl = view.layoutDirection == View.LAYOUT_DIRECTION_RTL
-            startInset = if (isRtl) insets.right else insets.left
-            endInset = if (isRtl) insets.left else insets.right
-            bottomInset = insets.bottom
-            statusBarTopInset = insets.top
-            updateContentPadding(view)
+            val isRtl = settingsLayout.layoutDirection == View.LAYOUT_DIRECTION_RTL
+            val startInset = if (isRtl) insets.right else insets.left
+            val endInset = if (isRtl) insets.left else insets.right
+
+            appBarContainer.setPadding(startInset, insets.top, endInset, 0)
+            settingsLayout.setPadding(startInset, 0, endInset, insets.bottom)
             windowInsets
+        }
+        ViewCompat.requestApplyInsets(settingsLayout)
+
+        val btnThemeLight = findViewById<View>(R.id.btnThemeLight)
+        val btnThemeDark = findViewById<View>(R.id.btnThemeDark)
+        val ivThemeLightIcon = findViewById<ImageView>(R.id.ivThemeLightIcon)
+        val tvThemeLightLabel = findViewById<TextView>(R.id.tvThemeLightLabel)
+        val ivThemeDarkIcon = findViewById<ImageView>(R.id.ivThemeDarkIcon)
+        val tvThemeDarkLabel = findViewById<TextView>(R.id.tvThemeDarkLabel)
+
+        fun updateThemeSelector(isDark: Boolean) {
+            btnThemeDark.isSelected = isDark
+            ivThemeDarkIcon.isSelected = isDark
+            tvThemeDarkLabel.isSelected = isDark
+
+            btnThemeLight.isSelected = !isDark
+            ivThemeLightIcon.isSelected = !isDark
+            tvThemeLightLabel.isSelected = !isDark
+        }
+
+        updateThemeSelector(isDark = ThemeManager.isDarkTheme(this))
+
+        btnThemeLight.setOnClickListener {
+            if (ThemeManager.isDarkTheme(this)) {
+                updateThemeSelector(isDark = false)
+                ThemeManager.setTheme(this, ThemeManager.THEME_LIGHT)
+            }
+        }
+
+        btnThemeDark.setOnClickListener {
+            if (!ThemeManager.isDarkTheme(this)) {
+                updateThemeSelector(isDark = true)
+                ThemeManager.setTheme(this, ThemeManager.THEME_DARK)
+            }
         }
 
         val cardWebsite = findViewById<MaterialCardView>(R.id.cardWebsite)
         val tvWebsiteTitle = findViewById<TextView>(R.id.tvWebsiteTitle)
         tvWebsiteTitle.setText(R.string.website_title)
+
+        val tvAppVersion = findViewById<TextView>(R.id.tvAppVersion)
+        val versionName = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0.4"
+        } catch (_: Exception) {
+            "1.0.4"
+        }
+        tvAppVersion.text = getString(R.string.version_format, versionName)
 
         cardWebsite.setOnClickListener {
             openOfficialWebsite()
@@ -111,7 +110,7 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
 
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(OFFICIAL_WEBSITE_URL))
+        val intent = Intent(Intent.ACTION_VIEW, OFFICIAL_WEBSITE_URL.toUri())
         try {
             startActivity(intent)
         } catch (_: ActivityNotFoundException) {

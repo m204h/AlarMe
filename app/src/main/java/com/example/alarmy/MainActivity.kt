@@ -5,7 +5,6 @@ import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -17,8 +16,11 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -29,81 +31,46 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
+        private const val REQUEST_CODE_NOTIFICATION_PERM = 101
+
+        private const val PREFS_PERM_NAME = "permission_prefs"
+        private const val PREF_SKIPPED_NOTIF = "skipped_notif_perm"
+        private const val PREF_SKIPPED_EXACT = "skipped_exact_perm"
+        private const val PREF_SKIPPED_FULLSCREEN = "skipped_fullscreen_perm"
     }
 
     private lateinit var storage: AlarmStorage
     private lateinit var adapter: AlarmAdapter
     private lateinit var alarms: MutableList<Alarm>
 
-    private val REQUEST_CODE_NOTIFICATION_PERM = 101
     private var isCheckingPermissions = false
+
+    private val permPrefs by lazy {
+        getSharedPreferences(PREFS_PERM_NAME, MODE_PRIVATE)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         val mainLayout = findViewById<View>(R.id.mainLayout)
-        val actionBarContainer = window.decorView.findViewById<View>(androidx.appcompat.R.id.action_bar_container)
+        val appBarContainer = findViewById<View>(R.id.appBarContainer)
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
 
-        val actionBarHeight = android.util.TypedValue().let { value ->
-            if (theme.resolveAttribute(androidx.appcompat.R.attr.actionBarSize, value, true)) {
-                android.util.TypedValue.complexToDimensionPixelSize(value.data, resources.displayMetrics)
-            } else {
-                0
-            }
-        }
-
-        var startInset = 0
-        var endInset = 0
-        var bottomInset = 0
-        var statusBarTopInset = 0
-
-        fun updateContentPadding(view: View) {
-            val topPadding = if (actionBarContainer != null && actionBarContainer.height > 0) {
-                val actionBarLocation = IntArray(2)
-                val viewLocation = IntArray(2)
-                actionBarContainer.getLocationOnScreen(actionBarLocation)
-                view.getLocationOnScreen(viewLocation)
-                val actionBarBottom = actionBarLocation[1] + actionBarContainer.height
-                val viewTop = viewLocation[1]
-                maxOf(0, actionBarBottom - viewTop)
-            } else {
-                val viewLocation = IntArray(2)
-                view.getLocationOnScreen(viewLocation)
-                val viewTop = viewLocation[1]
-                val estimatedActionBarBottom = statusBarTopInset + actionBarHeight
-                maxOf(0, estimatedActionBarBottom - viewTop)
-            }
-
-            if (view.paddingStart == startInset &&
-                view.paddingTop == topPadding &&
-                view.paddingEnd == endInset &&
-                view.paddingBottom == bottomInset
-            ) return
-
-            view.setPaddingRelative(
-                startInset,
-                topPadding,
-                endInset,
-                bottomInset,
-            )
-        }
-
-        mainLayout.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-            updateContentPadding(view)
-        }
-        ViewCompat.setOnApplyWindowInsetsListener(mainLayout) { view, windowInsets ->
+        ViewCompat.setOnApplyWindowInsetsListener(mainLayout) { _, windowInsets ->
             val insets = windowInsets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
             )
-            val isRtl = view.layoutDirection == View.LAYOUT_DIRECTION_RTL
-            startInset = if (isRtl) insets.right else insets.left
-            endInset = if (isRtl) insets.left else insets.right
-            bottomInset = insets.bottom
-            statusBarTopInset = insets.top
-            updateContentPadding(view)
+            val isRtl = mainLayout.layoutDirection == View.LAYOUT_DIRECTION_RTL
+            val startInset = if (isRtl) insets.right else insets.left
+            val endInset = if (isRtl) insets.left else insets.right
+
+            appBarContainer.setPadding(startInset, insets.top, endInset, 0)
+            mainLayout.setPadding(startInset, 0, endInset, insets.bottom)
             windowInsets
         }
+        ViewCompat.requestApplyInsets(mainLayout)
 
         storage = AlarmStorage(this)
         alarms = storage.getAlarms().toMutableList()
@@ -121,7 +88,7 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         0L
                     }
-                    val updated = alarm.copy(isEnabled = isEnabled, triggerTimeMillis = newTriggerTime)
+                    val updated = alarm.copy(isEnabled = isEnabled, triggerTimeMillis = newTriggerTime, snoozeTriggerTimeMillis = 0L)
                     alarms[index] = updated
                     storage.saveAlarms(alarms)
                     if (isEnabled) {
@@ -138,7 +105,7 @@ class MainActivity : AppCompatActivity() {
             },
             onEdit = { alarm ->
                 val intent = Intent(this, AddEditAlarmActivity::class.java).apply {
-                    putExtra("EXTRA_ALARM_ID", alarm.id)
+                    putExtra(AlarmService.EXTRA_ALARM_ID, alarm.id)
                 }
                 startActivity(intent)
             }
@@ -189,26 +156,32 @@ class MainActivity : AppCompatActivity() {
         if (isCheckingPermissions) return
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                isCheckingPermissions = true
-                AlertDialog.Builder(this)
-                    .setTitle("Notification Permission Needed")
-                    .setMessage("Notification permission is required so AlarMe can alert you when an alarm fires.")
-                    .setCancelable(false)
-                    .setPositiveButton("Allow") { _, _ ->
-                        isCheckingPermissions = false
-                        ActivityCompat.requestPermissions(
-                            this,
-                            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                            REQUEST_CODE_NOTIFICATION_PERM
-                        )
-                    }
-                    .setNegativeButton("Skip") { _, _ ->
-                        isCheckingPermissions = false
-                        checkNextPermissionStep2()
-                    }
-                    .show()
-                return
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+                permPrefs.edit { putBoolean(PREF_SKIPPED_NOTIF, false) }
+            } else {
+                val skipped = permPrefs.getBoolean(PREF_SKIPPED_NOTIF, false)
+                if (!skipped) {
+                    isCheckingPermissions = true
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.permission_notification_title)
+                        .setMessage(R.string.permission_notification_message)
+                        .setCancelable(false)
+                        .setPositiveButton(R.string.allow) { _, _ ->
+                            isCheckingPermissions = false
+                            ActivityCompat.requestPermissions(
+                                this,
+                                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                                REQUEST_CODE_NOTIFICATION_PERM
+                            )
+                        }
+                        .setNegativeButton(R.string.skip) { _, _ ->
+                            isCheckingPermissions = false
+                            permPrefs.edit { putBoolean(PREF_SKIPPED_NOTIF, true) }
+                            checkNextPermissionStep2()
+                        }
+                        .show()
+                    return
+                }
             }
         }
 
@@ -216,24 +189,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkNextPermissionStep2() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val alarmManager = getSystemService(AlarmManager::class.java)
-            if (!alarmManager.canScheduleExactAlarms()) {
+        val alarmManager = getSystemService(AlarmManager::class.java)
+        if (alarmManager.canScheduleExactAlarms()) {
+            permPrefs.edit { putBoolean(PREF_SKIPPED_EXACT, false) }
+        } else {
+            val skipped = permPrefs.getBoolean(PREF_SKIPPED_EXACT, false)
+            if (!skipped) {
                 isCheckingPermissions = true
                 AlertDialog.Builder(this)
-                    .setTitle("Exact Alarm Permission Needed")
-                    .setMessage("AlarMe needs Exact Alarm access to trigger alarms precisely on time.")
+                    .setTitle(R.string.permission_exact_alarm_title)
+                    .setMessage(R.string.permission_exact_alarm_message)
                     .setCancelable(false)
-                    .setPositiveButton("Open Settings") { _, _ ->
+                    .setPositiveButton(R.string.open_settings) { _, _ ->
                         isCheckingPermissions = false
+                        permPrefs.edit { putBoolean(PREF_SKIPPED_EXACT, true) }
                         try {
                             startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
                         } catch (_: Exception) {
-                            Toast.makeText(this, "Please allow Exact Alarms in System Settings", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this, R.string.toast_exact_alarm_settings, Toast.LENGTH_LONG).show()
                         }
                     }
-                    .setNegativeButton("Skip") { _, _ ->
+                    .setNegativeButton(R.string.skip) { _, _ ->
                         isCheckingPermissions = false
+                        permPrefs.edit { putBoolean(PREF_SKIPPED_EXACT, true) }
                         checkNextPermissionStep3()
                     }
                     .show()
@@ -247,37 +225,44 @@ class MainActivity : AppCompatActivity() {
     private fun checkNextPermissionStep3() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val notificationManager = getSystemService(NotificationManager::class.java)
-            if (!notificationManager.canUseFullScreenIntent()) {
-                isCheckingPermissions = true
-                AlertDialog.Builder(this)
-                    .setTitle("Full-Screen Alert Permission Needed")
-                    .setMessage("Full-screen alert permission is required to open the ringing screen over your lock screen when an alarm fires.")
-                    .setCancelable(false)
-                    .setPositiveButton("Open Settings") { _, _ ->
-                        isCheckingPermissions = false
-                        try {
-                            val intent = Intent(
-                                Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
-                                Uri.parse("package:$packageName")
-                            )
-                            startActivity(intent)
-                        } catch (_: Exception) {
+            if (notificationManager.canUseFullScreenIntent()) {
+                permPrefs.edit { putBoolean(PREF_SKIPPED_FULLSCREEN, false) }
+            } else {
+                val skipped = permPrefs.getBoolean(PREF_SKIPPED_FULLSCREEN, false)
+                if (!skipped) {
+                    isCheckingPermissions = true
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.permission_fullscreen_title)
+                        .setMessage(R.string.permission_fullscreen_message)
+                        .setCancelable(false)
+                        .setPositiveButton(R.string.open_settings) { _, _ ->
+                            isCheckingPermissions = false
+                            permPrefs.edit { putBoolean(PREF_SKIPPED_FULLSCREEN, true) }
                             try {
-                                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-                                }
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                                    "package:$packageName".toUri()
+                                )
                                 startActivity(intent)
                             } catch (_: Exception) {
-                                Toast.makeText(this, "Please allow Full Screen Intents in Settings", Toast.LENGTH_LONG).show()
+                                try {
+                                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                                    }
+                                    startActivity(intent)
+                                } catch (_: Exception) {
+                                    Toast.makeText(this, R.string.toast_fullscreen_settings, Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
-                    }
-                    .setNegativeButton("Skip") { _, _ ->
-                        isCheckingPermissions = false
-                        syncAndRescheduleAlarms()
-                    }
-                    .show()
-                return
+                        .setNegativeButton(R.string.skip) { _, _ ->
+                            isCheckingPermissions = false
+                            permPrefs.edit { putBoolean(PREF_SKIPPED_FULLSCREEN, true) }
+                            syncAndRescheduleAlarms()
+                        }
+                        .show()
+                    return
+                }
             }
         }
 
@@ -300,11 +285,7 @@ class MainActivity : AppCompatActivity() {
         alarms = storage.getAlarms().toMutableList()
         adapter.updateAlarms(alarms)
         updateHeading()
-        for (alarm in alarms) {
-            if (alarm.isEnabled) {
-                AlarmScheduler.scheduleAlarm(this, alarm)
-            }
-        }
+        AlarmScheduler.rescheduleAllEnabled(this, alarms)
     }
 
     private fun showDeleteDialog(alarm: Alarm) {
@@ -313,8 +294,8 @@ class MainActivity : AppCompatActivity() {
             .setMessage(R.string.delete_alarm_message)
             .setPositiveButton(R.string.delete) { _, _ ->
                 AlarmScheduler.cancelAlarm(this, alarm)
+                storage.deleteAlarm(alarm.id)
                 alarms.removeAll { it.id == alarm.id }
-                storage.saveAlarms(alarms)
                 adapter.updateAlarms(alarms)
                 updateHeading()
             }

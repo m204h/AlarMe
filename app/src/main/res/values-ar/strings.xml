@@ -2,10 +2,16 @@
     <string name="app_name">ألارمي</string>
     <string name="menu_settings">الإعدادات</string>
     <string name="no_alarm">لا توجد منبهات</string>
-    <string name="website_title">Contact Me</string>
-    <string name="website_desc">The official website for the AlarMe developer</string>
+    <string name="add_alarm">إضافة منبه</string>
+    <string name="website_title">تواصل معي</string>
+    <string name="website_desc">الموقع الرسمي لمطور ألارمي</string>
     <string name="no_browser_available">لا يتوفر متصفح ويب لفتح الموقع</string>
     <string name="website_url_not_configured">رابط الموقع غير محدد</string>
+    <string name="version_format">الإصدار %s</string>
+    <string name="theme_title">المظهر</string>
+    <string name="theme_desc">اختر مظهر التطبيق</string>
+    <string name="theme_light">فاتح</string>
+    <string name="theme_dark">داكن</string>
 
     <!-- Add / Edit Alarm Screen Strings -->
     <string name="new_alarm">منبه جديد</string>
@@ -28,8 +34,32 @@
     <string name="ok">موافق</string>
     <string name="delete">حذف</string>
     <string name="delete_alarm_title">حذف المنبه</string>
-    <string name="delete_alarm_message">هل أنت تأكد من رغبتك في حذف هذا المنبه؟</string>
+    <string name="delete_alarm_message">هل أنت متأكد من رغبتك في حذف هذا المنبه؟</string>
 
+    <!-- Ringing Screen Strings -->
+    <string name="alarm_ringing">المنبه يرن</string>
+    <string name="stop">إيقاف</string>
+    <string name="snooze">غفوة</string>
+    <string name="snooze_5_mins">غفوة (٥ دقائق)</string>
+
+    <!-- Permission Dialog Strings -->
+    <string name="permission_notification_title">مطلوب إذن الإشعارات</string>
+    <string name="permission_notification_message">يلزم إذن الإشعارات حتى يتمكن ألارمي من تنبيهك عند انطلاق المنبه.</string>
+    <string name="permission_exact_alarm_title">مطلوب إذن المنبهات الدقيقة</string>
+    <string name="permission_exact_alarm_message">يحتاج ألارمي إلى إذن المنبهات الدقيقة لتشغيل المنبه في الوقت المحدد تماماً.</string>
+    <string name="permission_fullscreen_title">مطلوب إذن التنبيه بشاشة كاملة</string>
+    <string name="permission_fullscreen_message">يلزم إذن التنبيه بشاشة كاملة لفتح شاشة الرنين فوق شاشة القفل عند انطلاق المنبه.</string>
+    <string name="allow">سماح</string>
+    <string name="skip">تخطي</string>
+    <string name="open_settings">فتح الإعدادات</string>
+    <string name="toast_exact_alarm_settings">يرجى السماح بالمنبهات الدقيقة في إعدادات النظام</string>
+    <string name="toast_fullscreen_settings">يرجى السماح بالتنبيهات بشاشة كاملة في الإعدادات</string>
+
+    <!-- Notification Channel Strings -->
+    <string name="notification_channel_name">خدمة المنبه</string>
+    <string name="notification_channel_desc">إشعار خدمة المنبه النشطة</string>
+
+    <!-- Days of week -->
     <string name="day_mon">ن</string>
     <string name="day_tue">ث</string>
     <string name="day_wed">ع</string>
@@ -37,4 +67,6 @@
     <string name="day_fri">ج</string>
     <string name="day_sat">س</string>
     <string name="day_sun">ح</string>
+
+    <string name="arrow_symbol">‹</string>
 </resources>
